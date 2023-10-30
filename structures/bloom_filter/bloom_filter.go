@@ -1,6 +1,7 @@
 package bloom_filter
 
 import (
+	"encoding/binary"
 	"math"
 	"nasp-project/structures/bitset"
 	"nasp-project/structures/hash"
@@ -65,4 +66,39 @@ func (bf *BloomFilter) HasKey(key []byte) bool {
 // Size Returns the number of elements added to the set.
 func (bf *BloomFilter) Size() uint {
 	return bf.size
+}
+
+func (bf *BloomFilter) Serialize() []byte {
+	bytes := make([]byte, 12+8*bf.k)
+
+	binary.LittleEndian.PutUint32(bytes[0:4], uint32(bf.m))
+	binary.LittleEndian.PutUint32(bytes[4:8], uint32(bf.k))
+	binary.LittleEndian.PutUint32(bytes[8:12], uint32(bf.size))
+
+	for i := uint(0); i < bf.k; i++ {
+		copy(bytes[12+8*i:20+8*i], bf.hashes[i].Seed)
+	}
+
+	bytes = append(bytes, bf.bitset.Serialize()...)
+
+	return bytes
+}
+
+func Deserialize(data []byte) *BloomFilter {
+	m := binary.LittleEndian.Uint32(data[0:4])
+	k := binary.LittleEndian.Uint32(data[4:8])
+	size := binary.LittleEndian.Uint32(data[8:12])
+
+	hashes := make([]hash.SeededHash, k)
+	for i := uint32(0); i < k; i++ {
+		hashes[i] = hash.NewSeededHash(binary.LittleEndian.Uint64(data[12+8*i : 20+8*i]))
+	}
+
+	return &BloomFilter{
+		uint(m),
+		bitset.Deserialize(data[12+8*k:]),
+		uint(k),
+		hashes,
+		uint(size),
+	}
 }
