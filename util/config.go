@@ -41,7 +41,28 @@ type CacheConfig struct {
 	MaxSize int `yaml:"maxSize"`
 }
 
-var config = getDefaultConfig()
+var config = &Config{
+	WAL: WALConfig{
+		SegmentSize: 512,
+	},
+	MemTable: MemTableConfig{
+		MaxSize:   1024,
+		Structure: "SkipList",
+		Instances: 1,
+	},
+	SSTable: SSTableConfig{
+		SavePath:      ".",
+		SummeryDegree: 5,
+		IndexDegree:   5,
+		Compression:   true,
+	},
+	LMS: LMSConfig{
+		MaxLevel: 4,
+	},
+	Cache: CacheConfig{
+		MaxSize: 1024,
+	},
+}
 
 // GetConfig returns config struct. Returns default config if LoadConfig is not called.
 func GetConfig() *Config {
@@ -51,50 +72,26 @@ func GetConfig() *Config {
 // LoadConfig loads config from path. If configuration does not exist, it sets a default value.
 func LoadConfig(path string) *Config {
 	file, err := os.ReadFile(path)
-
 	if err != nil {
 		return config
 	}
+
 	err = yaml.Unmarshal(file, &config)
 	if err != nil {
 		return config
 	}
-
 	return config
 }
 
+// SaveConfig saves config into `path`.
 func SaveConfig(path string) {
 	data, err := yaml.Marshal(&config)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	err = os.WriteFile(path, data, 0)
 	if err != nil {
 		log.Fatal(err)
-	}
-}
-
-func getDefaultConfig() *Config {
-	return &Config{
-		WAL: WALConfig{
-			SegmentSize: 512,
-		},
-		MemTable: MemTableConfig{
-			MaxSize:   1024,
-			Structure: "SkipList",
-			Instances: 1,
-		},
-		SSTable: SSTableConfig{
-			SavePath:      ".",
-			SummeryDegree: 5,
-			IndexDegree:   5,
-			Compression:   true,
-		},
-		LMS: LMSConfig{
-			MaxLevel: 4,
-		},
-		Cache: CacheConfig{
-			MaxSize: 1024,
-		},
 	}
 }
