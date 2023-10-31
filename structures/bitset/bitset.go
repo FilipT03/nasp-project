@@ -21,7 +21,7 @@ func (b *Bitset) Set(idx uint, val int8) {
 	if val != 0 {
 		b.bitset[idx>>3] |= 1 << (idx & 7)
 	} else {
-		b.bitset[idx>>3] &= (0xfe << (idx & 7)) + (1 << (idx & 7)) - 1
+		b.bitset[idx>>3] &= 0xff ^ (1 << (idx & 7))
 	}
 }
 
