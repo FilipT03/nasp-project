@@ -35,7 +35,7 @@ func NewHyperLogLog(p uint32) *HyperLogLog {
 	m := uint32(math.Ceil(math.Pow(2, float64(p))))
 	return &HyperLogLog{
 		m:    m,
-		p:    uint32(math.Ceil(math.Log2(float64(m)))),
+		p:    p,
 		reg:  make([]uint32, m),
 		hash: hash.CreateHashes(1)[0],
 	}
