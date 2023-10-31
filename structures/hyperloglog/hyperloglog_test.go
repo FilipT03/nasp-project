@@ -7,7 +7,7 @@ import (
 
 // TestSerialize tests Serialized and Deserialized.
 func TestSerialize(t *testing.T) {
-	hll := NewHyperLogLogWithPrecision(5)
+	hll := NewHyperLogLog(5)
 	for i := 0; i < 1_000; i++ {
 		hll.Add([]byte("Lazar"))
 		hll.Add([]byte("Dusan"))
@@ -39,7 +39,7 @@ func TestSerialize(t *testing.T) {
 
 // TestMaxPrecisionEstimate tests HLL_MAX_PRECISION on 20 000 000 added strings.
 func TestMaxPrecisionEstimate(t *testing.T) {
-	hll := NewHyperLogLogWithPrecision(HLL_MAX_PRECISION)
+	hll := NewHyperLogLog(HLL_MAX_PRECISION)
 	for i := 0; i < 1_000_000; i++ {
 		hll.Add([]byte("Mirko"))
 		hll.Add([]byte("Filip"))

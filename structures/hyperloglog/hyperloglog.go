@@ -30,8 +30,8 @@ func NewHyperLogLogWithSize(m uint32) *HyperLogLog {
 	}
 }
 
-// NewHyperLogLogWithPrecision returns a new HyperLogLog instance with precision of p.
-func NewHyperLogLogWithPrecision(p uint) *HyperLogLog {
+// NewHyperLogLog returns a new HyperLogLog instance with precision of p.
+func NewHyperLogLog(p uint32) *HyperLogLog {
 	m := uint32(math.Ceil(math.Pow(2, float64(p))))
 	return &HyperLogLog{
 		m:    m,
