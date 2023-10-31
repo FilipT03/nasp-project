@@ -3,11 +3,11 @@ package count_min_sketch
 import "testing"
 
 func TestAddAndGet(t *testing.T) {
-	cms := newCMS(0.01, 0.01, 42)
+	cms := NewCMS(0.01, 0.01)
 	element := "example_element"
 
-	cms.add(element)
-	count := cms.get(element)
+	cms.Add(element)
+	count := cms.Get(element)
 
 	if count != 1 {
 		t.Errorf("Expected count of %s to be 1, but got %d", element, count)

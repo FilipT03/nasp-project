@@ -15,7 +15,7 @@ type CMS struct {
 	seeds  []hash.SeededHash
 }
 
-func newCMS(epsilon float64, delta float64, seed uint) CMS {
+func NewCMS(epsilon float64, delta float64) CMS {
 	cols := CalculateM(epsilon)
 	rows := CalculateK(delta)
 	matrix := make([][]byte, rows)
@@ -32,7 +32,7 @@ func newCMS(epsilon float64, delta float64, seed uint) CMS {
 	}
 	return cms
 }
-func (cms CMS) add(el string) {
+func (cms CMS) Add(el string) {
 	dataByte := []byte(el)
 	for i := 0; i < len(cms.seeds); i++ {
 		hashedVal := cms.seeds[i].Hash(dataByte) % uint64(cms.cols)
@@ -41,7 +41,7 @@ func (cms CMS) add(el string) {
 	}
 }
 
-func (cms CMS) get(el string) int {
+func (cms CMS) Get(el string) int {
 	dataByte := []byte(el)
 	minimum := 255
 	for i := 0; i < len(cms.seeds); i++ {
