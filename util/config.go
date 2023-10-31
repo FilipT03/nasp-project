@@ -1,5 +1,10 @@
 package util
 
+import (
+	"gopkg.in/yaml.v3"
+	"os"
+)
+
 type Config struct {
 	WAL      WALConfig      `yaml:"WAL"`
 	MemTable MemTableConfig `yaml:"MemTable"`
@@ -31,4 +36,47 @@ type LMSConfig struct {
 
 type CacheConfig struct {
 	MaxSize int `yaml:"maxSize"`
+}
+
+var defaultConfig *Config = nil
+
+func GetDefaultConfig() *Config {
+	if defaultConfig == nil {
+		return &Config{
+			WAL: WALConfig{
+				SegmentSize: 512,
+			},
+			MemTable: MemTableConfig{
+				MaxSize:   1024,
+				Structure: "SkipList",
+				Instances: 1,
+			},
+			SSTable: SSTableConfig{
+				SavePath:      ".",
+				SummeryDegree: 5,
+				IndexDegree:   5,
+				Compression:   true,
+			},
+			LMS: LMSConfig{
+				MaxLevel: 4,
+			},
+			Cache: CacheConfig{
+				MaxSize: 1024,
+			},
+		}
+	}
+	return defaultConfig
+}
+
+func LoadConfig(path string) *Config {
+	file, err := os.ReadFile(path)
+	if err != nil {
+		return GetDefaultConfig()
+	}
+	var config Config
+	err = yaml.Unmarshal(file, &config)
+	if err != nil {
+		return GetDefaultConfig()
+	}
+	return &config
 }
