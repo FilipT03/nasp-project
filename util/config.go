@@ -1,5 +1,7 @@
 package util
 
+// TODO: Add support for size-tiered, leveled and token bucket algorithms
+
 import (
 	"gopkg.in/yaml.v3"
 	"os"
@@ -38,45 +40,49 @@ type CacheConfig struct {
 	MaxSize int `yaml:"maxSize"`
 }
 
-var defaultConfig *Config = nil
-
-func GetDefaultConfig() *Config {
-	if defaultConfig == nil {
-		return &Config{
-			WAL: WALConfig{
-				SegmentSize: 512,
-			},
-			MemTable: MemTableConfig{
-				MaxSize:   1024,
-				Structure: "SkipList",
-				Instances: 1,
-			},
-			SSTable: SSTableConfig{
-				SavePath:      ".",
-				SummeryDegree: 5,
-				IndexDegree:   5,
-				Compression:   true,
-			},
-			LMS: LMSConfig{
-				MaxLevel: 4,
-			},
-			Cache: CacheConfig{
-				MaxSize: 1024,
-			},
-		}
+func getDefaultConfig() *Config {
+	return &Config{
+		WAL: WALConfig{
+			SegmentSize: 512,
+		},
+		MemTable: MemTableConfig{
+			MaxSize:   1024,
+			Structure: "SkipList",
+			Instances: 1,
+		},
+		SSTable: SSTableConfig{
+			SavePath:      ".",
+			SummeryDegree: 5,
+			IndexDegree:   5,
+			Compression:   true,
+		},
+		LMS: LMSConfig{
+			MaxLevel: 4,
+		},
+		Cache: CacheConfig{
+			MaxSize: 1024,
+		},
 	}
-	return defaultConfig
 }
 
+var config = getDefaultConfig()
+
+// GetConfig returns config struct. Returns default config if LoadConfig is not called.
+func GetConfig() *Config {
+	return config
+}
+
+// LoadConfig loads config from path. If configuration does not exist, it sets a default value.
 func LoadConfig(path string) *Config {
 	file, err := os.ReadFile(path)
+
 	if err != nil {
-		return GetDefaultConfig()
+		return config
 	}
-	var config Config
 	err = yaml.Unmarshal(file, &config)
 	if err != nil {
-		return GetDefaultConfig()
+		return config
 	}
-	return &config
+
+	return config
 }
