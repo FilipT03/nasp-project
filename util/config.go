@@ -1,11 +1,12 @@
 package util
 
-// TODO: Add support for size-tiered, leveled and token bucket algorithms
-
 import (
 	"gopkg.in/yaml.v3"
+	"log"
 	"os"
 )
+
+// TODO: Add support for size-tiered, leveled and token bucket algorithms
 
 type Config struct {
 	WAL      WALConfig      `yaml:"WAL"`
@@ -40,6 +41,39 @@ type CacheConfig struct {
 	MaxSize int `yaml:"maxSize"`
 }
 
+var config = getDefaultConfig()
+
+// GetConfig returns config struct. Returns default config if LoadConfig is not called.
+func GetConfig() *Config {
+	return config
+}
+
+// LoadConfig loads config from path. If configuration does not exist, it sets a default value.
+func LoadConfig(path string) *Config {
+	file, err := os.ReadFile(path)
+
+	if err != nil {
+		return config
+	}
+	err = yaml.Unmarshal(file, &config)
+	if err != nil {
+		return config
+	}
+
+	return config
+}
+
+func SaveConfig(path string) {
+	data, err := yaml.Marshal(&config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = os.WriteFile(path, data, 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func getDefaultConfig() *Config {
 	return &Config{
 		WAL: WALConfig{
@@ -63,26 +97,4 @@ func getDefaultConfig() *Config {
 			MaxSize: 1024,
 		},
 	}
-}
-
-var config = getDefaultConfig()
-
-// GetConfig returns config struct. Returns default config if LoadConfig is not called.
-func GetConfig() *Config {
-	return config
-}
-
-// LoadConfig loads config from path. If configuration does not exist, it sets a default value.
-func LoadConfig(path string) *Config {
-	file, err := os.ReadFile(path)
-
-	if err != nil {
-		return config
-	}
-	err = yaml.Unmarshal(file, &config)
-	if err != nil {
-		return config
-	}
-
-	return config
 }

@@ -1,0 +1,15 @@
+WAL:
+    segmentSize: 512
+MemTable:
+    maxSize: 1024
+    structure: SkipList
+    instances: 1
+SSTable:
+    savePath: .
+    summeryDegree: 5
+    indexDegree: 5
+    compression: true
+LMS:
+    maxLevel: 4
+Cache:
+    maxSize: 1024
