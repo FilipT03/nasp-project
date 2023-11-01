@@ -34,7 +34,7 @@ func NewBTree(minItems int) *BTree {
 func (bt *BTree) Find(key string) ([]byte, error) {
 	index, node, _ := bt.findKey(key, true)
 	if index == -1 {
-		return nil, errors.New("error: key'" + "key" + "' not found in B tree")
+		return nil, errors.New("error: key '" + key + "' not found in B-tree")
 	}
 	return node.items[index].value, nil
 }
@@ -62,11 +62,11 @@ func (bt *BTree) Add(key string, value []byte) {
 	}
 }
 
-// Delete deletes key from B tree. Returns error if key is not found.
+// Delete deletes key from BTree. Returns error if key is not found.
 func (bt *BTree) Delete(key string) error {
 	index, nodeToDeleteFrom, ancestorsIndexes := bt.findKey(key, true)
 	if index == -1 {
-		return errors.New("error: key '" + "key" + "' not found in B tree")
+		return errors.New("error: could not delete key '" + "key" + "' as it does not exist B-tree")
 	}
 	if nodeToDeleteFrom.isLeaf() {
 		nodeToDeleteFrom.items = append(nodeToDeleteFrom.items[:index], nodeToDeleteFrom.items[index+1:]...)
@@ -106,18 +106,6 @@ func NewNode(owner *BTree, items []*Item, children []*Node) *Node {
 	}
 }
 
-// getPath converts nodeIndexes into *Node.
-func (bt *BTree) getPath(indexes []int) []*Node {
-	nodes := []*Node{bt.root}
-	child := bt.root
-
-	for i := 1; i < len(indexes); i++ {
-		child = child.children[indexes[i]]
-		nodes = append(nodes, child)
-	}
-	return nodes
-}
-
 // findKey returns index, node and ancestors of found key. If `exact` is true, it returns index -1 if key is not found.
 func (bt *BTree) findKey(key string, exact bool) (int, *Node, []int) {
 	current := bt.root
@@ -152,7 +140,19 @@ func (n *Node) findKey(key string) (bool, int) {
 	return false, len(n.items)
 }
 
-// balance handles underflow - left rotation, right rotation and merge.
+// getPath converts nodeIndexes into *Node.
+func (bt *BTree) getPath(indexes []int) []*Node {
+	nodes := []*Node{bt.root}
+	child := bt.root
+
+	for i := 1; i < len(indexes); i++ {
+		child = child.children[indexes[i]]
+		nodes = append(nodes, child)
+	}
+	return nodes
+}
+
+// balance handles underflow - rotateRight, rotateLeft and merge.
 func (n *Node) balance(unbalancedNodeIndex int) {
 	parentNode := n
 	unbalancedNode := parentNode.children[unbalancedNodeIndex]
@@ -250,10 +250,6 @@ func merge(parentNode *Node, unbalancedNodeIndex int) {
 	}
 }
 
-func (n *Node) isLeaf() bool {
-	return n.children == nil
-}
-
 func (n *Node) addItem(item *Item, index int) int {
 	if len(n.items) == index {
 		n.items = append(n.items, item)
@@ -295,4 +291,8 @@ func (n *Node) split(modifiedNode *Node, index int) {
 
 func newItem(key string, value []byte) *Item {
 	return &Item{key: key, value: value}
+}
+
+func (n *Node) isLeaf() bool {
+	return n.children == nil
 }
