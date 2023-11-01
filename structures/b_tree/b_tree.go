@@ -169,7 +169,7 @@ func (n *Node) balance(unbalancedNodeIndex int) {
 	var rightNode *Node
 	if unbalancedNodeIndex != 0 {
 		rightNode = parentNode.children[unbalancedNodeIndex+1]
-		if len(leftNode.items) > n.owner.minItems {
+		if len(rightNode.items) > n.owner.minItems {
 			rotateLeft(unbalancedNode, parentNode, rightNode, unbalancedNodeIndex)
 			return
 		}
