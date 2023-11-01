@@ -294,5 +294,5 @@ func newItem(key string, value []byte) *Item {
 }
 
 func (n *Node) isLeaf() bool {
-	return n.children == nil
+	return len(n.children) == 0
 }
