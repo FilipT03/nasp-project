@@ -174,7 +174,8 @@ func (n *Node) balance(unbalancedNodeIndex int) {
 			return
 		}
 	}
-	// TODO: merge
+
+	merge(parentNode, unbalancedNodeIndex)
 }
 
 func rotateRight(leftNode *Node, parentNode *Node, unbalancedNode *Node, unbalancedNodeIndex int) {
@@ -218,8 +219,39 @@ func rotateLeft(unbalancedNode *Node, parentNode *Node, rightNode *Node, unbalan
 
 }
 
+func merge(parentNode *Node, unbalancedNodeIndex int) {
+	unbalancedNode := parentNode.children[unbalancedNodeIndex]
+	if unbalancedNodeIndex == 0 {
+		rightNode := parentNode.children[unbalancedNodeIndex+1]
+
+		parentNodeItem := parentNode.items[0]
+		parentNode.items = parentNode.items[1:]
+		unbalancedNode.items = append(unbalancedNode.items, parentNodeItem)
+
+		unbalancedNode.items = append(unbalancedNode.items, rightNode.items...)
+		parentNode.children = append(parentNode.children[0:1], parentNode.children[2:]...)
+
+		if !rightNode.isLeaf() {
+			unbalancedNode.children = append(unbalancedNode.children, rightNode.children...)
+		}
+	} else {
+		leftNode := parentNode.children[unbalancedNodeIndex-1]
+
+		parentNodeItem := parentNode.items[unbalancedNodeIndex-1]
+		parentNode.items = append(parentNode.items[:unbalancedNodeIndex-1], parentNode.items[unbalancedNodeIndex:]...)
+		leftNode.items = append(leftNode.items, parentNodeItem)
+
+		leftNode.items = append(leftNode.items, unbalancedNode.items...)
+		parentNode.children = append(parentNode.children[:unbalancedNodeIndex], parentNode.children[unbalancedNodeIndex+1:]...)
+
+		if !leftNode.isLeaf() {
+			unbalancedNode.children = append(leftNode.children, unbalancedNode.children...)
+		}
+	}
+}
+
 func (n *Node) isLeaf() bool {
-	return len(n.children) == 0
+	return n.children == nil
 }
 
 func (n *Node) addItem(item *Item, index int) int {
