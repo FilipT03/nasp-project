@@ -1,4 +1,4 @@
-package LRU_cache
+package lru_cache
 
 import (
 	"testing"
@@ -22,8 +22,6 @@ func TestLRUCache(t *testing.T) {
 	// Test Print
 	lruCache.Print() // Print the current cache state
 
-	// Add more test cases as needed
-
 }
 
 func TestLRUCacheGetNonExistentKey(t *testing.T) {
@@ -35,7 +33,5 @@ func TestLRUCacheGetNonExistentKey(t *testing.T) {
 	if element != nil {
 		t.Errorf("Expected Get for a non-existent key to return nil, but it didn't.")
 	}
-
-	// Add more test cases for Get with non-existent keys
 
 }

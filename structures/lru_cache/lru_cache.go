@@ -1,4 +1,4 @@
-package LRU_cache
+package lru_cache
 
 import (
 	"container/list"
@@ -26,7 +26,17 @@ func NewLRUCache(capacity uint64) LRUCache {
 	return lruCache
 }
 
-func (LRU *LRUCache) Get(key uint64) *list.Element {
+// Get returns *Data for specified key, or nil if absent
+func (LRU *LRUCache) Get(key uint64) *Data {
+	element := LRU.get(key)
+	if element != nil {
+		return element.Value.(*Data)
+	}
+	return nil
+}
+
+// Used for my Put function to get list element
+func (LRU *LRUCache) get(key uint64) *list.Element {
 
 	value, ok := LRU.cache[key]
 	if ok {
@@ -36,9 +46,11 @@ func (LRU *LRUCache) Get(key uint64) *list.Element {
 	return nil
 
 }
+
+// Put adds or updates the value for specified key
 func (LRU *LRUCache) Put(key uint64, value []byte) {
 	data := Data{key: key, value: value}
-	findElement := LRU.Get(key)
+	findElement := LRU.get(key)
 
 	//if the record already exists
 	if findElement != nil {
@@ -65,6 +77,8 @@ func (LRU *LRUCache) Put(key uint64, value []byte) {
 	return
 
 }
+
+// Print prints the current cache state.
 func (LRU *LRUCache) Print() {
 	i := 0
 	node := LRU.list.Front()
