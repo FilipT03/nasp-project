@@ -215,7 +215,7 @@ func rotateLeft(unbalancedNode *Node, parentNode *Node, rightNode *Node, unbalan
 
 	unbalancedNode.items = append(unbalancedNode.items, parentNodeItem)
 
-	if unbalancedNode.isLeaf() {
+	if !unbalancedNode.isLeaf() {
 		childToShift := rightNode.children[0]
 		rightNode.children = unbalancedNode.children[1:]
 		unbalancedNode.children = append(unbalancedNode.children, childToShift)
