@@ -95,6 +95,10 @@ func (bt *BTree) Delete(key string) error {
 		}
 	}
 
+	if len(bt.root.items) == 0 && len(bt.root.children) > 0 {
+		bt.root = bt.root.children[len(bt.root.children)-1]
+	}
+
 	return nil
 }
 
@@ -167,7 +171,7 @@ func (n *Node) balance(unbalancedNodeIndex int) {
 	}
 
 	var rightNode *Node
-	if unbalancedNodeIndex != 0 {
+	if unbalancedNodeIndex != len(parentNode.children)-1 {
 		rightNode = parentNode.children[unbalancedNodeIndex+1]
 		if len(rightNode.items) > n.owner.minItems {
 			rotateLeft(unbalancedNode, parentNode, rightNode, unbalancedNodeIndex)
