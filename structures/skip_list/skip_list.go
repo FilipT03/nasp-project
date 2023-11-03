@@ -21,7 +21,7 @@ type SkipList struct {
 	isLimited bool
 }
 
-// NewSkipList creates a new empty skip list of the specified size.
+// NewSkipListOfSize creates a new empty skip list of the specified size.
 func NewSkipListOfSize(m uint32) *SkipList {
 	head := skipListNode{}
 	return &SkipList{
@@ -115,25 +115,6 @@ func (sl *SkipList) Add(item *item.Item) error {
 	return nil
 }
 
-// Searches for the key and returns the end node from which state can be determined.
-func (sl *SkipList) searchForKey(key string) *skipListNode {
-	currentNode := sl.head
-	for {
-		if currentNode.next == nil || key < currentNode.next.item.Key {
-			if currentNode.down == nil { // we reached the bottom
-				break
-			}
-			currentNode = currentNode.down
-		} else {
-			if currentNode.next == nil { // we reached the rightmost column
-				break
-			}
-			currentNode = currentNode.next
-		}
-	}
-	return currentNode
-}
-
 // Print the skip list
 func (sl *SkipList) Print() {
 	starterNode := sl.head
@@ -167,4 +148,56 @@ func (sl *SkipList) Print() {
 		println("nil")
 		starterNode = starterNode.down
 	}
+}
+
+// Delete attempts to delete the item with the specified key from the skip list. Returns error if it's not present.
+func (sl *SkipList) Delete(key string) error {
+	resultNode := sl.searchForKey(key)
+	if resultNode.item == nil || resultNode.item.Key != key {
+		return errors.New("the key is not present in the skip list")
+	} else {
+		currentNode := sl.head
+		for { // This for loop is structured a bit differently than other searches because we know the key is present.
+			if currentNode.next == nil {
+				currentNode = currentNode.down
+			} else if key <= currentNode.next.item.Key {
+				if key == currentNode.next.item.Key {
+					currentNode.next.down = nil
+					currentNode.next.item = nil
+					currentNode.next = currentNode.next.next // The garbage collector will delete the old node
+				}
+				if currentNode.down == nil { // we reached the bottom
+					break
+				}
+				currentNode = currentNode.down
+			} else {
+				if currentNode.next == nil { // we reached the rightmost column
+					break
+				}
+				currentNode = currentNode.next
+			}
+		}
+		sl.size--
+
+		return nil
+	}
+}
+
+// Searches for the key and returns the end node from which state can be determined.
+func (sl *SkipList) searchForKey(key string) *skipListNode {
+	currentNode := sl.head
+	for {
+		if currentNode.next == nil || key < currentNode.next.item.Key {
+			if currentNode.down == nil { // we reached the bottom
+				break
+			}
+			currentNode = currentNode.down
+		} else {
+			if currentNode.next == nil { // we reached the rightmost column
+				break
+			}
+			currentNode = currentNode.next
+		}
+	}
+	return currentNode
 }
