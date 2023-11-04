@@ -66,7 +66,7 @@ func (bt *BTree) Add(key string, value []byte) {
 func (bt *BTree) Delete(key string) error {
 	index, nodeToDeleteFrom, ancestorsIndexes := bt.findKey(key, true)
 	if index == -1 {
-		return errors.New("error: could not delete key '" + "key" + "' as it does not exist B-tree")
+		return errors.New("error: could not delete key '" + key + "' as it does not exist B-tree")
 	}
 	if nodeToDeleteFrom.isLeaf() {
 		nodeToDeleteFrom.items = append(nodeToDeleteFrom.items[:index], nodeToDeleteFrom.items[index+1:]...)
