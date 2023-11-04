@@ -4,6 +4,8 @@ MemTable:
     maxSize: 1024
     structure: SkipList
     instances: 1
+BTree:
+    minSize: 3
 SSTable:
     savePath: .
     summeryDegree: 5
