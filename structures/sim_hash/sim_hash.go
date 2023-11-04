@@ -9,21 +9,23 @@ import (
 
 var seededHash = hash.NewSeededHash(uint64(rand.Uint32())<<32 + uint64(rand.Uint32()))
 
-type Fingerprint uint64 // TODO: check if logic operators and bit shifts work with this
+type Fingerprint uint64
 type Vector [64]int
 
 type Feature interface {
+	// HashValue Returns the 64-bit hash value of this feature.
 	HashValue() uint64
+	// Weight Returns the weight of this feature.
 	Weight() int
 }
 
+// FeatureSet Represents a collection of features that describe a single document.
 type FeatureSet interface {
 	GetFeaturesSlice() []Feature
 }
 
 // ---
 
-// feature Provides a default implementation for Feature interface.
 type feature struct {
 	hashValue uint64
 	weight    int
@@ -52,7 +54,10 @@ func NewFeatureWithWeight(b []byte, weight int) feature {
 
 // ---
 
-// VectorFromFeatures ...
+// VectorFromFeatures Returns a 64 dimension vector given a set of features.
+// All the dimensions of the vector are set to 0. Then the i-th dimension of the vector is
+// incremented by the weight of the feature if the i-th bit of the feature is 1, and decremented
+// by the weight of the feature otherwise.
 func VectorFromFeatures(features []Feature) Vector {
 	var vector Vector
 
@@ -73,8 +78,27 @@ func VectorFromFeatures(features []Feature) Vector {
 	return vector
 }
 
-// GetFingerprint Returns a Fingerprint (uint64)
-// The i-th bit is 1 if the i-th dimension of vector is greater than 0
+// VectorFromBytes Returns a 64 dimension vector given a set of [][]byte,
+// where each []byte represents a single feature with weight 1.
+func VectorFromBytes(b [][]byte) Vector {
+	var vector Vector
+
+	for _, feature := range b {
+		hashValue := seededHash.Hash(feature)
+		for i := uint8(0); i < 64; i++ {
+			if (hashValue & (1 << i)) == 1 {
+				vector[i]++
+			} else {
+				vector[i]--
+			}
+		}
+	}
+
+	return vector
+}
+
+// GetFingerprint Returns a Fingerprint (uint64).
+// The i-th bit fo the fingerprint is 1 if the i-th dimension of vector is positive, 0 otherwise.
 func GetFingerprint(vector Vector) Fingerprint {
 	var print Fingerprint
 
@@ -89,17 +113,28 @@ func GetFingerprint(vector Vector) Fingerprint {
 
 // ---
 
+// SimHash Returns a Fingerprint that represents a 64 bit simhash of the given FeatureSet.
 func SimHash(features FeatureSet) Fingerprint {
 	return GetFingerprint(VectorFromFeatures(features.GetFeaturesSlice()))
 }
 
-// TODO add SimHashBytes
+// SimHash Returns a Fingerprint that represents a 64 bit simhash of the given features.
+func SimHashFeatures(features []Feature) Fingerprint {
+	return GetFingerprint(VectorFromFeatures(features))
+}
 
-// HammingDistance Calculates the number of bits that x and y differ in
+// SimHashBytes Returns a Fingerprint that represents a 64 bit simhash of the given bytes.
+// All the features that are represented by the byte rows are assumed to have the same weight 1.
+func SimHashBytes(features [][]byte) Fingerprint {
+	return GetFingerprint(VectorFromBytes(features))
+}
+
+// HammingDistance Calculates the hamming distance between two Fingerprint x and y.
 func HammingDistance(x, y Fingerprint) uint8 {
 	return uint8(bits.OnesCount64(uint64(x ^ y)))
 }
 
+// HammingDistanceFrom Calculates the Hamming distance between this Fingerprint and y.
 func (f Fingerprint) HammingDistanceFrom(y Fingerprint) uint8 {
 	return HammingDistance(f, y)
 }
@@ -110,6 +145,10 @@ func (f Fingerprint) Serialize() []byte {
 	bytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(bytes, uint64(f))
 	return bytes
+}
+
+func Serialize(f Fingerprint) []byte {
+	return f.Serialize()
 }
 
 func Deserialize(data []byte) Fingerprint {
