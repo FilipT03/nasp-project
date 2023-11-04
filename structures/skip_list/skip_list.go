@@ -35,9 +35,9 @@ func NewSkipListOfSize(m uint32) *SkipList {
 
 // NewSkipList creates a new empty skip list of unlimited size.
 func NewSkipList() *SkipList {
-	head := skipListNode{}
+	head := &skipListNode{}
 	return &SkipList{
-		&head,
+		head,
 		0,
 		0,
 		1,
@@ -48,17 +48,37 @@ func NewSkipList() *SkipList {
 // HasKey checks if the specified key is in the skip list.
 func (sl *SkipList) HasKey(key string) bool {
 	resultNode := sl.searchForKey(key)
+	return resultNode.item != nil && resultNode.item.Key == key
+}
 
-	if resultNode.item == nil || resultNode.item.Key != key {
-		return false
+// Get returns the value of the item with the specified key if present. If not, returns an error.
+func (sl *SkipList) Get(key string) ([]byte, error) {
+	resultNode := sl.searchForKey(key)
+	if resultNode.item != nil && resultNode.item.Key == key {
+		return resultNode.item.Value, nil
 	} else {
-		return true
+		return nil, errors.New("error: failed to get key " + key + ", it's not in the skip list")
 	}
 }
 
+// Update the element with the specified key by changing the item referenced by the skip list nodes. Return error if not
+// present.
+func (sl *SkipList) Update(key string, value []byte) error {
+	resultNode := sl.searchForKey(key)
+	if resultNode.item != nil && resultNode.item.Key == key {
+		resultNode.item.Value = value
+		return nil
+	} else {
+		return errors.New("error: failed to update element with key " + key + ", it's not in the skip list")
+	}
+}
+
+func (sl *SkipList) Size() uint32 {
+	return sl.size
+}
+
 // Add attempts to add a new item to the skip list. Returns error if the key is already present or the list is full.
-// New node points to the item sent as an argument.
-func (sl *SkipList) Add(item *item.Item) error {
+func (sl *SkipList) Add(key string, value []byte) error {
 	/*   x     o
 		 x  x  o
 		 o ox oo
@@ -69,14 +89,16 @@ func (sl *SkipList) Add(item *item.Item) error {
 	//   x's. The rightmost x's in each row are the ones who may point to our new element, depending on the height of
 	//   the new column. We will do the search twice, redirecting nodes on the second go.
 
-	resultNode := sl.searchForKey(item.Key)
-	if resultNode.item != nil && resultNode.item.Key == item.Key {
-		return errors.New("the key is already present in the skip list")
+	resultNode := sl.searchForKey(key)
+	if resultNode.item != nil && resultNode.item.Key == key {
+		return errors.New("error: failed to add item with the key " + key +
+			", same key is already present in the skip list")
 	}
 	if sl.isLimited && sl.size == sl.m {
-		return errors.New("the skip list is already full")
+		return errors.New("error: failed to add item with key " + key + ", skip list is full")
 	}
 	sl.size++
+	newItem := &item.Item{Key: key, Value: value}
 
 	var newHeight uint32 = 1
 	for rand.Intn(2) == 1 {
@@ -92,9 +114,9 @@ func (sl *SkipList) Add(item *item.Item) error {
 	currentNode := sl.head
 	var lastAddedNode *skipListNode = nil // keeping track of the last added node se we can redirect its down pointer.
 	for {
-		if currentNode.next == nil || item.Key < currentNode.next.item.Key {
+		if currentNode.next == nil || key < currentNode.next.item.Key {
 			if currentHeight <= newHeight { // we are adding a new node
-				currentNode.next = &skipListNode{currentNode.next, nil, item}
+				currentNode.next = &skipListNode{currentNode.next, nil, newItem}
 				if lastAddedNode != nil {
 					lastAddedNode.down = currentNode.next
 				}
@@ -154,7 +176,7 @@ func (sl *SkipList) Print() {
 func (sl *SkipList) Delete(key string) error {
 	resultNode := sl.searchForKey(key)
 	if resultNode.item == nil || resultNode.item.Key != key {
-		return errors.New("the key is not present in the skip list")
+		return errors.New("error: failed to delete key" + key + ", it's not in the skip list")
 	} else {
 		currentNode := sl.head
 		for { // This for loop is structured a bit differently than other searches because we know the key is present.
