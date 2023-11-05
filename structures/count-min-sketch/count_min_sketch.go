@@ -32,8 +32,7 @@ func NewCMS(epsilon float64, delta float64) *CMS {
 }
 
 // Add adds an element to the matrix
-func (cms *CMS) Add(el string) {
-	dataByte := []byte(el)
+func (cms *CMS) Add(dataByte []byte) {
 	for i := 0; i < len(cms.seeds); i++ {
 		hashedVal := cms.seeds[i].Hash(dataByte) % uint64(cms.cols)
 		cms.matrix[i][hashedVal] += 1
@@ -42,8 +41,7 @@ func (cms *CMS) Add(el string) {
 }
 
 // Get returns the minimum count of the element in the matrix
-func (cms *CMS) Get(el string) int {
-	dataByte := []byte(el)
+func (cms *CMS) Get(dataByte []byte) int {
 	minimum := 255
 	for i := 0; i < len(cms.seeds); i++ {
 		hashedVal := cms.seeds[i].Hash(dataByte) % uint64(cms.cols)
