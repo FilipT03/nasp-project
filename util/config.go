@@ -21,9 +21,19 @@ type WALConfig struct {
 }
 
 type MemTableConfig struct {
-	MaxSize   int    `yaml:"maxSize"`
-	Structure string `yaml:"structure"`
-	Instances int    `yaml:"instances"`
+	MaxSize   int            `yaml:"maxSize"`
+	Structure string         `yaml:"structure"`
+	Instances int            `yaml:"instances"`
+	SkipList  SkipListConfig `yaml:"SkipList"`
+	BTree     BTreeConfig    `yaml:"BTree"`
+}
+
+type BTreeConfig struct {
+	MinSize int `yaml:"minSize"`
+}
+
+type SkipListConfig struct {
+	MaxHeight int `yaml:"maxHeight"`
 }
 
 type SSTableConfig struct {
@@ -49,6 +59,12 @@ var config = &Config{
 		MaxSize:   1024,
 		Structure: "SkipList",
 		Instances: 1,
+		BTree: BTreeConfig{
+			MinSize: 16,
+		},
+		SkipList: SkipListConfig{
+			MaxHeight: 32,
+		},
 	},
 	SSTable: SSTableConfig{
 		SavePath:      ".",
@@ -76,10 +92,7 @@ func LoadConfig(path string) *Config {
 		return config
 	}
 
-	err = yaml.Unmarshal(file, &config)
-	if err != nil {
-		return config
-	}
+	_ = yaml.Unmarshal(file, &config)
 	return config
 }
 
