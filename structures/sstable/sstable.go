@@ -91,11 +91,17 @@ func CreateSSTable(recs []DataRecord, config util.SSTableConfig) (*SSTable, erro
 		return nil, err
 	}
 
+	if config.SingleFile {
+		sstable.Summary.StartOffset = sstable.Index.StartOffset + sstable.Index.Size
+	}
 	err = sstable.Summary.CreateFromIndexRecords(config.SummaryDegree, idxRecs)
 	if err != nil {
 		return nil, err
 	}
 
+	if config.SingleFile {
+		sstable.Filter.StartOffset = sstable.Summary.StartOffset + sstable.Summary.Size
+	}
 	keys := make([][]byte, len(recs))
 	for i, rec := range recs {
 		keys[i] = rec.Key
