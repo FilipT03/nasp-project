@@ -3,11 +3,10 @@ package sim_hash
 import (
 	"encoding/binary"
 	"math/bits"
-	"math/rand"
 	"nasp-project/structures/hash"
 )
 
-var seededHash = hash.NewSeededHash(uint64(rand.Uint32())<<32 + uint64(rand.Uint32()))
+var seededHash = hash.NewSeededHash(14_02_2003)
 
 type Fingerprint uint64
 type Vector [64]int
@@ -86,7 +85,7 @@ func VectorFromBytes(b [][]byte) Vector {
 	for _, feature := range b {
 		hashValue := seededHash.Hash(feature)
 		for i := uint8(0); i < 64; i++ {
-			if (hashValue & (1 << i)) == 1 {
+			if ((hashValue >> i) & 1) == 1 {
 				vector[i]++
 			} else {
 				vector[i]--
@@ -115,7 +114,7 @@ func GetFingerprint(vector Vector) Fingerprint {
 
 // SimHash Returns a Fingerprint that represents a 64 bit simhash of the given FeatureSet.
 func SimHash(features FeatureSet) Fingerprint {
-	return GetFingerprint(VectorFromFeatures(features.GetFeaturesSlice()))
+	return SimHashFeatures(features.GetFeaturesSlice())
 }
 
 // SimHash Returns a Fingerprint that represents a 64 bit simhash of the given features.
@@ -124,7 +123,7 @@ func SimHashFeatures(features []Feature) Fingerprint {
 }
 
 // SimHashBytes Returns a Fingerprint that represents a 64 bit simhash of the given bytes.
-// All the features that are represented by the byte rows are assumed to have the same weight 1.
+// All the features that are represented by []byte are assumed to have the same weight 1.
 func SimHashBytes(features [][]byte) Fingerprint {
 	return GetFingerprint(VectorFromBytes(features))
 }
