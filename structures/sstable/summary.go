@@ -1,6 +1,7 @@
 package sstable
 
 import (
+	bytesUtil "bytes"
 	"encoding/binary"
 	"os"
 )
@@ -324,4 +325,37 @@ func (sb *SummaryBlock) writeRecord(sr SummaryRecord) []byte {
 	copy(bytes[8+len(sr.Key):], offsetBytes)
 
 	return bytes
+}
+
+// GetIndexOffset returns the SummaryRecord with the largest key that is less than or equal to the given key.
+// It returns nil if the key is not found.
+// Note: If the summary block is not loaded into memory, it will be loaded.
+// It returns an error if the summary block cannot be read.
+func (sb *SummaryBlock) GetIndexOffset(key []byte) (*SummaryRecord, error) {
+	if !sb.HasLoaded() {
+		err := sb.Load()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Binary search
+	l := 0
+	r := len(sb.Records) - 1
+	lp := -1
+	for l <= r {
+		m := l + (r-l)/2
+		if bytesUtil.Compare(sb.Records[m].Key, key) <= 0 {
+			lp = m
+			l = m + 1
+		} else {
+			r = m - 1
+		}
+	}
+
+	if lp == -1 {
+		return nil, nil
+	} else {
+		return &sb.Records[lp], nil
+	}
 }

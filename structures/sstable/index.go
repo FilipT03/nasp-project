@@ -1,6 +1,7 @@
 package sstable
 
 import (
+	"bytes"
 	"encoding/binary"
 	"os"
 )
@@ -191,4 +192,69 @@ func (ib *IndexBlock) writeRecord(file *os.File, ir IndexRecord) error {
 	}
 
 	return nil
+}
+
+// getRecordAtOffset returns the IndexRecord at the given offset in the index block file.
+func (ib *IndexBlock) getRecordAtOffset(file *os.File, offset int64) (*IndexRecord, error) {
+	_, err := file.Seek(ib.StartOffset+offset, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	keySizeBytes := make([]byte, 8)
+	_, err = file.Read(keySizeBytes)
+	if err != nil {
+		return nil, err
+	}
+	keySize := binary.LittleEndian.Uint64(keySizeBytes)
+
+	key := make([]byte, keySize)
+	_, err = file.Read(key)
+	if err != nil {
+		return nil, err
+	}
+
+	offsetBytes := make([]byte, 8)
+	_, err = file.Read(offsetBytes)
+	if err != nil {
+		return nil, err
+	}
+	offset = int64(binary.LittleEndian.Uint64(offsetBytes))
+
+	return &IndexRecord{key, offset}, nil
+}
+
+// GetRecordWithKeyFromOffset returns the IndexRecord with the largest key that is less than or
+// equal to the given key, starting from the given offset.
+// Returns the record if the key is found, or nil if the key is not found.
+// Returns an error if there is an error while reading the index block.
+func (ib *IndexBlock) GetRecordWithKeyFromOffset(key []byte, offset int64) (*IndexRecord, error) {
+	file, err := os.Open(ib.Filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var lastFoundRecord *IndexRecord = nil
+	for {
+		idxRec, err := ib.getRecordAtOffset(file, offset)
+		if err != nil {
+			return nil, err
+		}
+		if idxRec == nil {
+			return lastFoundRecord, nil
+		}
+		cmp := bytes.Compare(idxRec.Key, key)
+		if cmp == 0 {
+			return idxRec, nil
+		} else if cmp < 0 {
+			lastFoundRecord = idxRec
+		} else {
+			return lastFoundRecord, nil
+		}
+		offset += 16 + int64(len(idxRec.Key)) // offset of the next record
+		if offset >= ib.Size {
+			return lastFoundRecord, nil
+		}
+	}
 }

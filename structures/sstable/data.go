@@ -1,6 +1,7 @@
 package sstable
 
 import (
+	bytesUtil "bytes"
 	"encoding/binary"
 	"os"
 )
@@ -115,4 +116,115 @@ func (db *DataBlock) Write(recs []DataRecord) error {
 	db.Size -= db.StartOffset
 
 	return nil
+}
+
+// getRecordAtOffset reads a record from the data block file at the given offset.
+func (db *DataBlock) getRecordAtOffset(offset int64) (*DataRecord, error) {
+	file, err := os.Open(db.Filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	_, err = file.Seek(db.StartOffset+offset, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes := make([]byte, 4)
+	_, err = file.Read(bytes)
+	if err != nil {
+		return nil, err
+	}
+	crc := binary.LittleEndian.Uint32(bytes)
+
+	bytes = make([]byte, 8)
+	_, err = file.Read(bytes)
+	if err != nil {
+		return nil, err
+	}
+	timestamp := binary.LittleEndian.Uint64(bytes)
+
+	bytes = make([]byte, 1)
+	_, err = file.Read(bytes)
+	if err != nil {
+		return nil, err
+	}
+	tombstone := bytes[0] == 1
+
+	bytes = make([]byte, 8)
+	_, err = file.Read(bytes)
+	if err != nil {
+		return nil, err
+	}
+	keySize := binary.LittleEndian.Uint64(bytes)
+
+	var valueSize uint64
+	if !tombstone {
+		bytes = make([]byte, 8)
+		_, err = file.Read(bytes)
+		if err != nil {
+			return nil, err
+		}
+		valueSize = binary.LittleEndian.Uint64(bytes)
+	}
+
+	key := make([]byte, keySize)
+	_, err = file.Read(key)
+	if err != nil {
+		return nil, err
+	}
+
+	var value []byte
+	if !tombstone {
+		value = make([]byte, valueSize)
+		_, err = file.Read(value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &DataRecord{
+		CRC:       crc,
+		Tombstone: tombstone,
+		Key:       key,
+		Value:     value,
+		Timestamp: timestamp,
+	}, nil
+}
+
+// GetRecordWithKeyFromOffset reads a record with the given key from the data block file, starting from the offset.
+// Returns nil if the record is not found.
+func (db *DataBlock) GetRecordWithKeyFromOffset(key []byte, offset int64) (*DataRecord, error) {
+	// TODO: Add CRC check
+	file, err := os.Open(db.Filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	_, err = file.Seek(db.StartOffset+offset, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		dataRec, err := db.getRecordAtOffset(offset)
+		if err != nil {
+			return nil, err
+		}
+		if dataRec == nil {
+			return nil, nil
+		}
+		cmp := bytesUtil.Compare(dataRec.Key, key)
+		if cmp == 0 {
+			return dataRec, nil
+		} else if cmp > 0 {
+			return nil, nil
+		}
+		if dataRec.Tombstone {
+			offset += 21 + int64(len(dataRec.Key))
+		} else {
+			offset += 29 + int64(len(dataRec.Key)) + int64(len(dataRec.Value))
+		}
+	}
 }
