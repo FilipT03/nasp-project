@@ -6,7 +6,7 @@ import (
 
 func TestAddAndGet(t *testing.T) {
 	cms := NewCMS(0.01, 0.01)
-	element := "example_element"
+	element := []byte("example_element")
 
 	cms.Add(element)
 	count := cms.Get(element)
@@ -42,9 +42,9 @@ func TestSerializationAndDeserialization(t *testing.T) {
 	cms1 := NewCMS(0.01, 0.001)
 
 	// Add some data to the CMS
-	cms1.Add("apple")
-	cms1.Add("banana")
-	cms1.Add("cherry")
+	cms1.Add([]byte("apple"))
+	cms1.Add([]byte("banana"))
+	cms1.Add([]byte("cherry"))
 
 	// Serialize the CMS
 	serializedData := cms1.Serialize()
@@ -65,8 +65,8 @@ func TestSerializationAndDeserialization(t *testing.T) {
 
 	// Verify that the counts are the same
 	for _, element := range []string{"apple", "banana", "cherry"} {
-		count1 := cms1.Get(element)
-		count2 := cms2.Get(element)
+		count1 := cms1.Get([]byte(element))
+		count2 := cms2.Get([]byte(element))
 
 		if count1 != count2 {
 			t.Errorf("Counts for element %s are different. Original: %d, Deserialized: %d", element, count1, count2)
