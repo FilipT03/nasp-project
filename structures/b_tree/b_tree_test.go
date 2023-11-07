@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestFind(t *testing.T) {
+func TestGet(t *testing.T) {
 	bt := NewBTree(2)
 	bt.Add("1", []byte("1"))
 	bt.Add("2", []byte("2"))
@@ -15,21 +15,21 @@ func TestFind(t *testing.T) {
 	bt.Add("7", []byte("7"))
 	bt.Add("8", []byte("8"))
 
-	val, err := bt.Find("2")
+	val, err := bt.Get("2")
 	if err != nil {
 		t.Error(err)
 	}
 	if string(val) != "2" {
 		t.Errorf("Expected \"2\" got %v", val)
 	}
-	val, err = bt.Find("4")
+	val, err = bt.Get("4")
 	if err != nil {
 		t.Error(err)
 	}
 	if string(val) != "4" {
 		t.Errorf("Expected \"4\" got %v", val)
 	}
-	val, err = bt.Find("8")
+	val, err = bt.Get("8")
 	if err != nil {
 		t.Error(err)
 	}
@@ -118,7 +118,7 @@ func TestLeftRotation(t *testing.T) {
 		t.Error(err)
 	}
 
-	if _, err := bt.Find("8"); err == nil {
+	if _, err := bt.Get("8"); err == nil {
 		t.Error("Found deleted key")
 	}
 
@@ -153,7 +153,7 @@ func TestMergeHeightLoss(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if _, err := bt.Find("C"); err == nil {
+	if _, err := bt.Get("C"); err == nil {
 		t.Error("Found deleted key")
 	}
 	if len(bt.root.items) != 6 {

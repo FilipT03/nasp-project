@@ -30,8 +30,8 @@ func NewBTree(minItems int) *BTree {
 	return owner
 }
 
-// Find searches key in B tree.
-func (bt *BTree) Find(key string) ([]byte, error) {
+// Get searches key in B tree.
+func (bt *BTree) Get(key string) ([]byte, error) {
 	index, node, _ := bt.findKey(key, true)
 	if index == -1 {
 		return nil, errors.New("error: key '" + key + "' not found in B-tree")
