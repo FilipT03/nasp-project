@@ -15,33 +15,21 @@ type skipListNode struct {
 
 type SkipList struct {
 	head      *skipListNode // first node
-	m         uint32        // maximal number of nodes
+	maxSize   uint32        // maximal number of nodes
 	size      uint32        // number of nodes currently in the skip list
+	maxHeight uint32        // maximal height, recommended to be at least log2(maxSize)
 	height    uint32        // height of the tallest column including the first
-	isLimited bool
 }
 
-// NewSkipListOfSize creates a new empty skip list of the specified size.
-func NewSkipListOfSize(m uint32) *SkipList {
+// NewSkipList creates a new empty skip list of the specified size.
+func NewSkipList(maxSize uint32, maxHeight uint32) *SkipList {
 	head := skipListNode{}
 	return &SkipList{
 		&head,
-		m,
+		maxSize,
 		0,
+		maxHeight,
 		1,
-		true,
-	}
-}
-
-// NewSkipList creates a new empty skip list of unlimited size.
-func NewSkipList() *SkipList {
-	head := &skipListNode{}
-	return &SkipList{
-		head,
-		0,
-		0,
-		1,
-		false,
 	}
 }
 
@@ -77,7 +65,8 @@ func (sl *SkipList) Size() uint32 {
 	return sl.size
 }
 
-// Add attempts to add a new item to the skip list. Returns error if the key is already present or the list is full.
+// Add attempts to add a new item to the skip list. If they key is already present, updates the item.
+// Returns error if the list is full.
 func (sl *SkipList) Add(key string, value []byte) error {
 	/*   x     o
 		 x  x  o
@@ -90,18 +79,20 @@ func (sl *SkipList) Add(key string, value []byte) error {
 	//   the new column. We will do the search twice, redirecting nodes on the second go.
 
 	resultNode := sl.searchForKey(key)
-	if resultNode.item != nil && resultNode.item.Key == key {
-		return errors.New("error: failed to add item with the key " + key +
-			", same key is already present in the skip list")
+	if resultNode.item != nil && resultNode.item.Key == key { // The key is already present, so we update it instead.
+		resultNode.item.Key = key
+		resultNode.item.Value = value
+		return nil
 	}
-	if sl.isLimited && sl.size == sl.m {
+	if sl.size == sl.maxSize {
 		return errors.New("error: failed to add item with key " + key + ", skip list is full")
 	}
 	sl.size++
 	newItem := &item.Item{Key: key, Value: value}
 
 	var newHeight uint32 = 1
-	for rand.Intn(2) == 1 {
+	// We go to maxHeight-1, because then the first column will be at maxHeight
+	for rand.Intn(2) == 1 && newHeight < sl.maxHeight-1 {
 		newHeight++
 	}
 
