@@ -6,14 +6,14 @@ import (
 
 func TestGet(t *testing.T) {
 	bt := NewBTree(2)
-	bt.Add("1", []byte("1"))
-	bt.Add("2", []byte("2"))
-	bt.Add("3", []byte("3"))
-	bt.Add("4", []byte("4"))
-	bt.Add("5", []byte("5"))
-	bt.Add("6", []byte("6"))
-	bt.Add("7", []byte("7"))
-	bt.Add("8", []byte("8"))
+	_ = bt.Add("1", []byte("1"))
+	_ = bt.Add("2", []byte("2"))
+	_ = bt.Add("3", []byte("3"))
+	_ = bt.Add("4", []byte("4"))
+	_ = bt.Add("5", []byte("5"))
+	_ = bt.Add("6", []byte("6"))
+	_ = bt.Add("7", []byte("7"))
+	_ = bt.Add("8", []byte("8"))
 
 	val, err := bt.Get("2")
 	if err != nil {
@@ -41,17 +41,17 @@ func TestGet(t *testing.T) {
 func TestSplit(t *testing.T) {
 	bt := NewBTree(3)
 
-	bt.Add("2", []byte{1})
-	bt.Add("5", []byte{1})
-	bt.Add("9", []byte{1})
-	bt.Add("7", []byte{1})
-	bt.Add("3", []byte{1})
-	bt.Add("8", []byte{1})
-	bt.Add("A", []byte{1})
-	bt.Add("D", []byte{1})
-	bt.Add("B", []byte{1})
-	bt.Add("E", []byte{1})
-	bt.Add("F", []byte{1})
+	_ = bt.Add("2", []byte{1})
+	_ = bt.Add("5", []byte{1})
+	_ = bt.Add("9", []byte{1})
+	_ = bt.Add("7", []byte{1})
+	_ = bt.Add("3", []byte{1})
+	_ = bt.Add("8", []byte{1})
+	_ = bt.Add("A", []byte{1})
+	_ = bt.Add("D", []byte{1})
+	_ = bt.Add("B", []byte{1})
+	_ = bt.Add("E", []byte{1})
+	_ = bt.Add("F", []byte{1})
 
 	rootNode := bt.root
 	if len(rootNode.items) != 2 {
@@ -104,14 +104,14 @@ func TestSplit(t *testing.T) {
 func TestLeftRotation(t *testing.T) {
 	bt := NewBTree(3)
 
-	bt.Add("2", []byte{1})
-	bt.Add("4", []byte{1})
-	bt.Add("8", []byte{1})
-	bt.Add("9", []byte{1})
-	bt.Add("A", []byte{1})
-	bt.Add("C", []byte{1})
-	bt.Add("E", []byte{1})
-	bt.Add("H", []byte{1})
+	_ = bt.Add("2", []byte{1})
+	_ = bt.Add("4", []byte{1})
+	_ = bt.Add("8", []byte{1})
+	_ = bt.Add("9", []byte{1})
+	_ = bt.Add("A", []byte{1})
+	_ = bt.Add("C", []byte{1})
+	_ = bt.Add("E", []byte{1})
+	_ = bt.Add("H", []byte{1})
 
 	err := bt.Delete("8")
 	if err != nil {
@@ -141,13 +141,13 @@ func TestLeftRotation(t *testing.T) {
 func TestMergeHeightLoss(t *testing.T) {
 	bt := NewBTree(3)
 
-	bt.Add("2", []byte{1})
-	bt.Add("9", []byte{1})
-	bt.Add("4", []byte{1})
-	bt.Add("8", []byte{1})
-	bt.Add("A", []byte{1})
-	bt.Add("C", []byte{1})
-	bt.Add("G", []byte{1})
+	_ = bt.Add("2", []byte{1})
+	_ = bt.Add("9", []byte{1})
+	_ = bt.Add("4", []byte{1})
+	_ = bt.Add("8", []byte{1})
+	_ = bt.Add("A", []byte{1})
+	_ = bt.Add("C", []byte{1})
+	_ = bt.Add("G", []byte{1})
 
 	err := bt.Delete("C")
 	if err != nil {

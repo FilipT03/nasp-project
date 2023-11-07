@@ -30,7 +30,7 @@ func NewBTree(minItems int) *BTree {
 	return owner
 }
 
-// Get searches key in B tree.
+// Get searches for a key in the B-tree and returns an error if the key is not found.
 func (bt *BTree) Get(key string) ([]byte, error) {
 	index, node, _ := bt.findKey(key, true)
 	if index == -1 {
@@ -39,8 +39,8 @@ func (bt *BTree) Get(key string) ([]byte, error) {
 	return node.items[index].value, nil
 }
 
-// Add adds new key into B tree while handling overflows.
-func (bt *BTree) Add(key string, value []byte) {
+// Add a new key to the B-tree while handling overflows.
+func (bt *BTree) Add(key string, value []byte) error {
 	item := newItem(key, value)
 	index, nodeToInsert, ancestors := bt.findKey(item.key, false)
 	nodeToInsert.addItem(item, index)
@@ -60,9 +60,10 @@ func (bt *BTree) Add(key string, value []byte) {
 		newRoot.split(bt.root, 0)
 		bt.root = newRoot
 	}
+	return nil
 }
 
-// Delete deletes key from BTree. Returns error if key is not found.
+// Delete removes a key from the BTree. It returns an error if the key is not found.
 func (bt *BTree) Delete(key string) error {
 	index, nodeToDeleteFrom, ancestorsIndexes := bt.findKey(key, true)
 	if index == -1 {
@@ -131,7 +132,7 @@ func (bt *BTree) findKey(key string, exact bool) (int, *Node, []int) {
 	}
 }
 
-// findKey tries to find a key in Node. If not found, returns index where key should be.
+// findKey attempts to locate a key in the Node and returns the index where the key should be inserted if not found.
 func (n *Node) findKey(key string) (bool, int) {
 	for i, item := range n.items {
 		if key == item.key {
@@ -144,7 +145,7 @@ func (n *Node) findKey(key string) (bool, int) {
 	return false, len(n.items)
 }
 
-// getPath converts nodeIndexes into *Node.
+// getPath converts node indexes into Node pointers.
 func (bt *BTree) getPath(indexes []int) []*Node {
 	nodes := []*Node{bt.root}
 	child := bt.root
@@ -156,7 +157,7 @@ func (bt *BTree) getPath(indexes []int) []*Node {
 	return nodes
 }
 
-// balance handles underflow - rotateRight, rotateLeft and merge.
+// balance handles underflow by performing rotation (rotateRight, rotateLeft) and merging operations.
 func (n *Node) balance(unbalancedNodeIndex int) {
 	parentNode := n
 	unbalancedNode := parentNode.children[unbalancedNodeIndex]
@@ -265,7 +266,7 @@ func (n *Node) addItem(item *Item, index int) int {
 	return index
 }
 
-// split handles overflow.
+// split handles overflow by dividing a node into two nodes.
 func (n *Node) split(modifiedNode *Node, index int) {
 	minSize := n.owner.minItems
 	childIndex := 0
