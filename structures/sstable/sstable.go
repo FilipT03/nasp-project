@@ -20,7 +20,9 @@ type SSTable struct {
 
 // CreateSSTable creates an SSTable from the given data records and writes it to disk.
 func CreateSSTable(recs []DataRecord, config util.SSTableConfig) (*SSTable, error) {
-	label, err := getNextSStableLabel(config.SavePath)
+	path := filepath.Join(config.SavePath, "L001") // when creating from memory, always save to L001
+
+	label, err := getNextSStableLabel(filepath.Join(path, "TOC"))
 	if err != nil {
 		return nil, err
 	}
@@ -31,41 +33,41 @@ func CreateSSTable(recs []DataRecord, config util.SSTableConfig) (*SSTable, erro
 		// Starting offset for each block is calculated after the previous block is written.
 		sstable = &SSTable{
 			Data: DataBlock{
-				Filename:    filepath.Join(config.SavePath, "usertable-"+label+"-SSTable.db"),
+				Filename:    filepath.Join(path, "usertable-"+label+"-SSTable.db"),
 				StartOffset: 0,
 			},
 			Index: IndexBlock{
-				Filename: filepath.Join(config.SavePath, "usertable-"+label+"-SSTable.db"),
+				Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
 			},
 			Summary: SummaryBlock{
-				Filename: filepath.Join(config.SavePath, "usertable-"+label+"-SSTable.db"),
+				Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
 			},
 			Filter: FilterBlock{
-				Filename: filepath.Join(config.SavePath, "usertable-"+label+"-SSTable.db"),
+				Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
 			},
-			TOCFilename:      filepath.Join(config.SavePath, "usertable-"+label+"-L001-TOC.txt"),
-			MetadataFilename: filepath.Join(config.SavePath, "usertable-"+label+"-Metadata.txt"),
+			TOCFilename:      filepath.Join(path, "TOC", "usertable-"+label+"-TOC.txt"),
+			MetadataFilename: filepath.Join(path, "usertable-"+label+"-Metadata.txt"),
 		}
 	} else {
 		sstable = &SSTable{
 			Data: DataBlock{
-				Filename:    filepath.Join(config.SavePath, "usertable-"+label+"-Data.db"),
+				Filename:    filepath.Join(path, "usertable-"+label+"-Data.db"),
 				StartOffset: 0,
 			},
 			Index: IndexBlock{
-				Filename:    filepath.Join(config.SavePath, "usertable-"+label+"-Index.db"),
+				Filename:    filepath.Join(path, "usertable-"+label+"-Index.db"),
 				StartOffset: 0,
 			},
 			Summary: SummaryBlock{
-				Filename:    filepath.Join(config.SavePath, "usertable-"+label+"-Summary.db"),
+				Filename:    filepath.Join(path, "usertable-"+label+"-Summary.db"),
 				StartOffset: 0,
 			},
 			Filter: FilterBlock{
-				Filename:    filepath.Join(config.SavePath, "usertable-"+label+"-Filter.db"),
+				Filename:    filepath.Join(path, "usertable-"+label+"-Filter.db"),
 				StartOffset: 0,
 			},
-			TOCFilename:      filepath.Join(config.SavePath, "usertable-"+label+"-L001-TOC.txt"),
-			MetadataFilename: filepath.Join(config.SavePath, "usertable-"+label+"-Metadata.txt"),
+			TOCFilename:      filepath.Join(path, "TOC", "usertable-"+label+"-TOC.txt"),
+			MetadataFilename: filepath.Join(path, "usertable-"+label+"-Metadata.txt"),
 		}
 	}
 
@@ -122,12 +124,20 @@ func CreateSSTable(recs []DataRecord, config util.SSTableConfig) (*SSTable, erro
 
 // getNextSStableLabel finds the largest label number in the given path and returns the next label number.
 func getNextSStableLabel(path string) (string, error) {
+	// ReadDir if exists. if not, create and read
 	folder, err := os.ReadDir(path)
 	if err != nil {
-		return "", err
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(path, 0755)
+			if err != nil {
+				return "", err
+			}
+		} else {
+			return "", err
+		}
 	}
 
-	re := regexp.MustCompile(`usertable-(\d+)-L(\d+)-TOC.txt`)
+	re := regexp.MustCompile(`usertable-(\d+)-TOC.txt`)
 
 	maxNum := 0
 	for _, file := range folder {
