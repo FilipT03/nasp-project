@@ -166,6 +166,9 @@ func (ib *IndexBlock) CreateFromDataRecords(sparseDeg int, recs []DataRecord) ([
 	}
 
 	ib.Size, err = file.Seek(0, 1)
+	if err != nil {
+		return nil, err
+	}
 	ib.Size -= ib.StartOffset
 	return idxRecs, nil
 }

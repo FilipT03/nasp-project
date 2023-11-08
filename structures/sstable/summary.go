@@ -167,13 +167,13 @@ func (sb *SummaryBlock) CreateFromIndexBlock(sparseDeg int, ib *IndexBlock) erro
 		}
 		keySize := binary.LittleEndian.Uint64(keySizeBytes)
 
-		if cnt%sparseDeg == 0 {
-			key := make([]byte, keySize)
-			_, err = ibFile.Read(key)
-			if err != nil {
-				return err
-			}
+		key := make([]byte, keySize)
+		_, err = ibFile.Read(key)
+		if err != nil {
+			return err
+		}
 
+		if cnt%sparseDeg == 0 {
 			offset, err := ibFile.Seek(8, 1) // Skip over the offset
 			if err != nil {
 				return err
@@ -190,10 +190,11 @@ func (sb *SummaryBlock) CreateFromIndexBlock(sparseDeg int, ib *IndexBlock) erro
 				binary.LittleEndian.PutUint64(startSizeBytes, uint64(len(key)))
 				startKey = key
 			}
-			// Last key
-			binary.LittleEndian.PutUint64(endSizeBytes, uint64(len(key)))
-			endKey = key
 		}
+
+		// Last key
+		binary.LittleEndian.PutUint64(endSizeBytes, uint64(len(key)))
+		endKey = key
 	}
 
 	// Open the file and write the summary block
@@ -286,13 +287,13 @@ func (sb *SummaryBlock) CreateFromIndexRecords(sparseDeg int, recs []IndexRecord
 
 	// End Key
 	endSizeBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(endSizeBytes, uint64(len(sumRecs[len(sumRecs)-1].Key)))
+	binary.LittleEndian.PutUint64(endSizeBytes, uint64(len(recs[len(recs)-1].Key)))
 	_, err = file.Write(endSizeBytes)
 	if err != nil {
 		return err
 	}
 
-	_, err = file.Write(sumRecs[len(sumRecs)-1].Key)
+	_, err = file.Write(recs[len(recs)-1].Key)
 	if err != nil {
 		return err
 	}
