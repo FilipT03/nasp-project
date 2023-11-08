@@ -2,11 +2,17 @@ package sim_hash
 
 import (
 	"encoding/binary"
+	"errors"
 	"math/bits"
 	"nasp-project/structures/hash"
+	"regexp"
+	"strings"
 )
 
 var seededHash = hash.NewSeededHash(14_02_2003)
+
+// Regular expression to separate words from text.
+var wordsRe = regexp.MustCompile(`[^\W\d][\w'-]*`)
 
 type Fingerprint uint64
 type Vector [64]int
@@ -127,6 +133,40 @@ func SimHashFeatures(features []Feature) Fingerprint {
 func SimHashBytes(features [][]byte) Fingerprint {
 	return GetFingerprint(VectorFromBytes(features))
 }
+
+// SimHashText Calculates a simhash for the given text. One word corresponds to one feature and the weight
+// of the feature is the number of occurences of its word in the text. Returns error if no words are found in the given text.
+func SimHashText(text string) (Fingerprint, error) {
+	words := wordsRe.FindAllString(text, -1)
+
+	if len(words) == 0 {
+		return 0, errors.New("No words found in the provided text.")
+	}
+
+	// TODO maby add stopword removal
+
+	features := map[string]*feature{}
+
+	for _, word := range words {
+		word = strings.ToLower(word)
+
+		if _, ok := features[word]; !ok {
+			newFeature := NewFeatureWithWeight([]byte(word), 0)
+			features[word] = &newFeature
+		}
+
+		features[word].weight++
+	}
+
+	var featuresSlice []Feature
+	for _, feature := range features {
+		featuresSlice = append(featuresSlice, *feature)
+	}
+
+	return SimHashFeatures(featuresSlice), nil
+}
+
+// ---
 
 // HammingDistance Calculates the hamming distance between two Fingerprint x and y.
 func HammingDistance(x, y Fingerprint) uint8 {
