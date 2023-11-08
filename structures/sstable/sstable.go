@@ -1,6 +1,7 @@
 package sstable
 
 import (
+	"bytes"
 	"fmt"
 	"nasp-project/util"
 	"os"
@@ -285,4 +286,165 @@ func (sst *SSTable) writeTOCFile() error {
 	}
 
 	return nil
+}
+
+// OpenSSTableFromToc opens an SSTable from the given TOC file.
+func OpenSSTableFromToc(tocPath string) (*SSTable, error) {
+	tocFile, err := os.Open(tocPath)
+	if err != nil {
+		return nil, err
+	}
+	defer tocFile.Close()
+
+	sstable := &SSTable{
+		TOCFilename: tocPath,
+	}
+
+	for i := 0; i < 4; i++ {
+		var startOffset int64
+		var size int64
+		var filename string
+
+		_, err := fmt.Fscanf(tocFile, "%d %d %s\n", &startOffset, &size, &filename)
+		if err != nil {
+			return nil, err
+		}
+
+		switch i {
+		case 0:
+			sstable.Data = DataBlock{
+				Filename:    filename,
+				StartOffset: startOffset,
+				Size:        size,
+			}
+		case 1:
+			sstable.Index = IndexBlock{
+				Filename:    filename,
+				StartOffset: startOffset,
+				Size:        size,
+			}
+		case 2:
+			sstable.Summary = SummaryBlock{
+				Filename:    filename,
+				StartOffset: startOffset,
+				Size:        size,
+			}
+		case 3:
+			sstable.Filter = FilterBlock{
+				Filename:    filename,
+				StartOffset: startOffset,
+				Size:        size,
+			}
+		}
+	}
+
+	_, err = fmt.Fscanf(tocFile, "%s\n", &sstable.MetadataFilename)
+	if err != nil {
+		return nil, err
+	}
+
+	return sstable, nil
+}
+
+// Read returns the record with the given key from the SSTable.
+// Returns nil if the key does not exist.
+// Returns an error if the read fails.
+func (sst *SSTable) Read(key []byte) (*DataRecord, error) {
+	if !sst.Filter.HasLoaded() {
+		err := sst.Filter.Load()
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			sst.Filter.Filter = nil
+		}()
+	}
+	if !sst.Filter.Filter.HasKey(key) {
+		return nil, nil
+	}
+
+	if !sst.Summary.HasRangeLoaded() {
+		err := sst.Summary.LoadRange()
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			sst.Summary.StartKey = nil
+			sst.Summary.EndKey = nil
+		}()
+	}
+	if bytes.Compare(key, sst.Summary.StartKey) < 0 {
+		return nil, nil
+	}
+	if bytes.Compare(key, sst.Summary.EndKey) > 0 {
+		return nil, nil
+	}
+
+	if !sst.Summary.HasLoaded() {
+		err := sst.Summary.Load()
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			sst.Summary.Records = nil
+		}()
+	}
+	sr, err := sst.Summary.GetIndexOffset(key)
+	if err != nil {
+		return nil, err
+	}
+
+	ir, err := sst.Index.GetRecordWithKeyFromOffset(key, sr.Offset)
+	if err != nil {
+		return nil, err
+	}
+
+	record, err := sst.Data.GetRecordWithKeyFromOffset(key, ir.Offset)
+	if err != nil {
+		return nil, err
+	}
+
+	return record, nil
+}
+
+// Read searches the LSM tree for the record with the given key.
+// Returns the record if it is found, nil otherwise.
+// The returned record is from the lowest LSM Tree level that contains the record.
+// If the record is found in multiple same-level SSTables, the record with the latest timestamp is returned.
+// Returns an error if the read fails.
+func Read(key []byte, config util.Config) (*DataRecord, error) {
+	for lvl := 1; lvl <= config.LSMTree.MaxLevel; lvl++ {
+		lvlLabel := fmt.Sprintf("L%03d", lvl)
+		path := filepath.Join(config.SSTable.SavePath, lvlLabel, "TOC")
+		folder, err := os.ReadDir(path)
+		if err != nil {
+			return nil, err
+		}
+
+		var record *DataRecord = nil
+		for _, file := range folder {
+			if file.IsDir() {
+				continue
+			}
+			table, err := OpenSSTableFromToc(filepath.Join(path, file.Name()))
+			if err != nil {
+				return nil, err
+			}
+			rec, err := table.Read(key)
+			if err != nil {
+				return nil, err
+			}
+			if rec == nil {
+				continue
+			}
+			if record == nil || rec.Timestamp > record.Timestamp {
+				record = rec
+			}
+		}
+
+		if record != nil {
+			return record, nil
+		}
+	}
+	return nil, nil
 }
