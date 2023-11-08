@@ -53,6 +53,11 @@ func (sb *SummaryBlock) LoadRange() error {
 	}
 	defer file.Close()
 
+	_, err = file.Seek(sb.StartOffset, 0)
+	if err != nil {
+		return err
+	}
+
 	startSizeBytes := make([]byte, 8)
 	_, err = file.Read(startSizeBytes)
 	if err != nil {
@@ -129,6 +134,14 @@ func (sb *SummaryBlock) Load() error {
 		offset := int64(binary.LittleEndian.Uint64(offsetBytes))
 
 		sb.Records = append(sb.Records, SummaryRecord{key, offset})
+
+		pos, err := file.Seek(0, 1)
+		if err != nil {
+			return err
+		}
+		if pos >= sb.Size {
+			break
+		}
 	}
 
 	return nil
