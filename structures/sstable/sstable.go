@@ -19,9 +19,8 @@ type SSTable struct {
 	MetadataFilename string
 }
 
-// CreateSSTable creates an SSTable from the given data records and writes it to disk.
-func CreateSSTable(recs []DataRecord, config util.SSTableConfig) (*SSTable, error) {
-	path := filepath.Join(config.SavePath, "L001") // when creating from memory, always save to L001
+func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
+	path := filepath.Join(config.SavePath, fmt.Sprintf("L%03d", level))
 
 	label, err := getNextSStableLabel(filepath.Join(path, "TOC"))
 	if err != nil {
@@ -78,6 +77,16 @@ func CreateSSTable(recs []DataRecord, config util.SSTableConfig) (*SSTable, erro
 		if e != nil {
 			return nil, e
 		}
+		return nil, err
+	}
+
+	return sstable, nil
+}
+
+// CreateSSTable creates an SSTable from the given data records and writes it to disk.
+func CreateSSTable(recs []DataRecord, config util.SSTableConfig) (*SSTable, error) {
+	sstable, err := initializeSSTable(1, config) // when creating from memory, always save to the level no 1
+	if err != nil {
 		return nil, err
 	}
 
@@ -412,7 +421,7 @@ func (sst *SSTable) Read(key []byte) (*DataRecord, error) {
 // The returned record is from the lowest LSM Tree level that contains the record.
 // If the record is found in multiple same-level SSTables, the record with the latest timestamp is returned.
 // Returns an error if the read fails.
-func Read(key []byte, config util.Config) (*DataRecord, error) {
+func Read(key []byte, config *util.Config) (*DataRecord, error) {
 	for lvl := 1; lvl <= config.LSMTree.MaxLevel; lvl++ {
 		lvlLabel := fmt.Sprintf("L%03d", lvl)
 		path := filepath.Join(config.SSTable.SavePath, lvlLabel, "TOC")
@@ -447,4 +456,61 @@ func Read(key []byte, config util.Config) (*DataRecord, error) {
 		}
 	}
 	return nil, nil
+}
+
+func MergeSSTables(sst1, sst2 *SSTable, level int, config util.SSTableConfig) (*SSTable, error) {
+	sstable, err := initializeSSTable(level, config)
+	if err != nil {
+		return nil, err
+	}
+
+	numRecords, err := sstable.Data.WriteMerged(&sst1.Data, &sst2.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	if config.SingleFile {
+		sstable.Index.StartOffset = sstable.Data.StartOffset + sstable.Data.Size
+	}
+	err = sstable.Index.CreateFromDataBlock(config.IndexDegree, &sstable.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	if config.SingleFile {
+		sstable.Summary.StartOffset = sstable.Index.StartOffset + sstable.Index.Size
+	}
+	err = sstable.Summary.CreateFromIndexBlock(config.SummaryDegree, &sstable.Index)
+	if err != nil {
+		return nil, err
+	}
+
+	if config.SingleFile {
+		sstable.Filter.StartOffset = sstable.Summary.StartOffset + sstable.Summary.Size
+	}
+	err = sstable.Filter.CreateFromDataBlock(numRecords, config.FilterPrecision, &sstable.Data)
+	if err != nil {
+		return nil, err
+	}
+	err = sstable.Filter.Write()
+	if err != nil {
+		return nil, err
+	}
+	sstable.Filter.Filter = nil
+
+	// TODO: Write Merkle Tree to Metadata file
+
+	err = sstable.writeTOCFile()
+
+	err = sst1.deleteFiles()
+	if err != nil {
+		return nil, err
+	}
+
+	err = sst2.deleteFiles()
+	if err != nil {
+		return nil, err
+	}
+
+	return sstable, nil
 }
