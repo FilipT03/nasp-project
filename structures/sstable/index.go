@@ -111,13 +111,15 @@ func (ib *IndexBlock) CreateFromDataBlock(sparseDeg int, db *DataBlock) error {
 		if err != nil {
 			return err
 		}
+		last := offset >= db.Size // whether this is the last record
+
 		offset -= 21 + int64(len(key)) + int64(valueSize) // offset of the start of the record
 		if tombstone[0] == 0 {
 			offset -= 8 // value size field is not present if the record is a tombstone
 		}
 		offset -= db.StartOffset // offset of the start of the record relative to the start of the data block
 
-		if cnt%sparseDeg == 0 || offset >= db.Size { // add every sparseDeg-th record and the last record
+		if cnt%sparseDeg == 0 || last { // add every sparseDeg-th record and the last record
 			err = ib.writeRecord(file, IndexRecord{key, offset})
 			if err != nil {
 				return err

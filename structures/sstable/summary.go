@@ -186,11 +186,12 @@ func (sb *SummaryBlock) CreateFromIndexBlock(sparseDeg int, ib *IndexBlock) erro
 			return err
 		}
 
+		offset, err := ibFile.Seek(8, 1) // Skip over the offset
+		if err != nil {
+			return err
+		}
+
 		if cnt%sparseDeg == 0 {
-			offset, err := ibFile.Seek(8, 1) // Skip over the offset
-			if err != nil {
-				return err
-			}
 			offset -= 16 + int64(len(key)) // Start of the record
 
 			sr := SummaryRecord{
@@ -203,11 +204,17 @@ func (sb *SummaryBlock) CreateFromIndexBlock(sparseDeg int, ib *IndexBlock) erro
 				binary.LittleEndian.PutUint64(startSizeBytes, uint64(len(key)))
 				startKey = key
 			}
+
+			offset += 16 + int64(len(key)) // End of the record
 		}
 
 		// Last key
 		binary.LittleEndian.PutUint64(endSizeBytes, uint64(len(key)))
 		endKey = key
+
+		if offset >= ib.Size {
+			break
+		}
 	}
 
 	// Open the file and write the summary block
@@ -217,7 +224,7 @@ func (sb *SummaryBlock) CreateFromIndexBlock(sparseDeg int, ib *IndexBlock) erro
 	}
 	defer file.Close()
 
-	_, err = file.Seek(sb.StartOffset+16, 0)
+	_, err = file.Seek(sb.StartOffset, 0)
 	if err != nil {
 		return err
 	}
