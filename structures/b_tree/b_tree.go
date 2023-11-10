@@ -1,62 +1,64 @@
 package b_tree
 
-import "errors"
+import (
+	"errors"
+	"nasp-project/util"
+)
 
-type Item struct {
-	key   string
-	value []byte
-}
+// TODO: Add BTree size and capacity
 
 type Node struct {
 	owner    *BTree
-	items    []*Item
+	records  []*util.DataRecord
 	children []*Node
 }
 
 type BTree struct {
-	root     *Node
-	minItems int
-	maxItems int
+	root       *Node
+	capacity   uint32
+	size       uint32
+	minRecords int
+	maxRecords int
 }
 
 // NewBTree returns a new empty BTree instance.
-func NewBTree(minItems int) *BTree {
+func NewBTree(minRecords int) *BTree {
 	owner := &BTree{
 		root: &Node{},
 	}
 	owner.root.owner = owner
-	owner.minItems = minItems
-	owner.maxItems = 2 * minItems
+	owner.minRecords = minRecords
+	owner.maxRecords = 2 * minRecords
 	return owner
 }
 
 // Get searches for a key in the B-tree and returns an error if the key is not found.
-func (bt *BTree) Get(key string) ([]byte, error) {
+func (bt *BTree) Get(key string) (*util.DataRecord, error) {
 	index, node, _ := bt.findKey(key, true)
 	if index == -1 {
 		return nil, errors.New("error: key '" + key + "' not found in B-tree")
 	}
-	return node.items[index].value, nil
+	return node.records[index], nil
 }
 
-// Add a new key to the B-tree while handling overflows.
+// Add a new record to the B-tree while handling overflows.
 func (bt *BTree) Add(key string, value []byte) error {
-	item := newItem(key, value)
-	index, nodeToInsert, ancestors := bt.findKey(item.key, false)
-	nodeToInsert.addItem(item, index)
+	record := util.NewRecord([]byte(key), value)
+	index, nodeToInsert, ancestors := bt.findKey(string(record.Key), false)
+	nodeToInsert.addRecord(record, index)
 	nodePath := bt.getPath(ancestors)
 
 	for i := len(nodePath) - 2; i >= 0; i-- {
 		parentNode := nodePath[i]
 		node := nodePath[i+1]
 		nodeIndex := ancestors[i+1]
-		if len(node.items) > bt.maxItems {
+		if len(node.records) > bt.maxRecords {
 			parentNode.split(node, nodeIndex)
 		}
 	}
 
-	if len(bt.root.items) > bt.maxItems {
-		newRoot := NewNode(bt, []*Item{}, []*Node{bt.root})
+	if len(bt.root.records) > bt.maxRecords {
+		newRoot := NewNode(bt, []*util.DataRecord{}, []*Node{bt.root})
 		newRoot.split(bt.root, 0)
 		bt.root = newRoot
 	}
@@ -70,7 +72,7 @@ func (bt *BTree) Delete(key string) error {
 		return errors.New("error: could not delete key '" + key + "' as it does not exist B-tree")
 	}
 	if nodeToDeleteFrom.isLeaf() {
-		nodeToDeleteFrom.items = append(nodeToDeleteFrom.items[:index], nodeToDeleteFrom.items[index+1:]...)
+		nodeToDeleteFrom.records = append(nodeToDeleteFrom.records[:index], nodeToDeleteFrom.records[index+1:]...)
 	} else {
 		affectedNodes := make([]int, 0)
 		affectedNodes = append(affectedNodes, index)
@@ -81,8 +83,8 @@ func (bt *BTree) Delete(key string) error {
 			childNode = childNode.children[traverseIndex]
 			affectedNodes = append(affectedNodes, traverseIndex)
 		}
-		nodeToDeleteFrom.items[index] = childNode.items[len(childNode.items)-1]
-		childNode.items = childNode.items[:len(childNode.items)-1]
+		nodeToDeleteFrom.records[index] = childNode.records[len(childNode.records)-1]
+		childNode.records = childNode.records[:len(childNode.records)-1]
 
 		ancestorsIndexes = append(ancestorsIndexes, affectedNodes...)
 	}
@@ -91,22 +93,22 @@ func (bt *BTree) Delete(key string) error {
 	for i := len(ancestors) - 2; i >= 0; i-- {
 		parentNode := ancestors[i]
 		node := ancestors[i+1]
-		if len(node.items) < bt.minItems {
+		if len(node.records) < bt.minRecords {
 			parentNode.balance(ancestorsIndexes[i+1])
 		}
 	}
 
-	if len(bt.root.items) == 0 && len(bt.root.children) > 0 {
+	if len(bt.root.records) == 0 && len(bt.root.children) > 0 {
 		bt.root = bt.root.children[len(bt.root.children)-1]
 	}
 
 	return nil
 }
 
-func NewNode(owner *BTree, items []*Item, children []*Node) *Node {
+func NewNode(owner *BTree, items []*util.DataRecord, children []*Node) *Node {
 	return &Node{
 		owner:    owner,
-		items:    items,
+		records:  items,
 		children: children,
 	}
 }
@@ -134,15 +136,15 @@ func (bt *BTree) findKey(key string, exact bool) (int, *Node, []int) {
 
 // findKey attempts to locate a key in the Node and returns the index where the key should be inserted if not found.
 func (n *Node) findKey(key string) (bool, int) {
-	for i, item := range n.items {
-		if key == item.key {
+	for i, record := range n.records {
+		if key == string(record.Key) {
 			return true, i
 		}
-		if key < item.key {
+		if key < string(record.Key) {
 			return false, i
 		}
 	}
-	return false, len(n.items)
+	return false, len(n.records)
 }
 
 // getPath converts node indexes into Node pointers.
@@ -165,7 +167,7 @@ func (n *Node) balance(unbalancedNodeIndex int) {
 	var leftNode *Node
 	if unbalancedNodeIndex != 0 {
 		leftNode = parentNode.children[unbalancedNodeIndex-1]
-		if len(leftNode.items) > n.owner.minItems {
+		if len(leftNode.records) > n.owner.minRecords {
 			rotateRight(leftNode, parentNode, unbalancedNode, unbalancedNodeIndex)
 			return
 		}
@@ -174,7 +176,7 @@ func (n *Node) balance(unbalancedNodeIndex int) {
 	var rightNode *Node
 	if unbalancedNodeIndex != len(parentNode.children)-1 {
 		rightNode = parentNode.children[unbalancedNodeIndex+1]
-		if len(rightNode.items) > n.owner.minItems {
+		if len(rightNode.records) > n.owner.minRecords {
 			rotateLeft(unbalancedNode, parentNode, rightNode, unbalancedNodeIndex)
 			return
 		}
@@ -184,17 +186,17 @@ func (n *Node) balance(unbalancedNodeIndex int) {
 }
 
 func rotateRight(leftNode *Node, parentNode *Node, unbalancedNode *Node, unbalancedNodeIndex int) {
-	leftNodeItem := leftNode.items[len(leftNode.items)-1]
-	leftNode.items = leftNode.items[:len(leftNode.items)-1]
+	leftNodeItem := leftNode.records[len(leftNode.records)-1]
+	leftNode.records = leftNode.records[:len(leftNode.records)-1]
 
 	parentNodeItemIndex := unbalancedNodeIndex - 1
 	if unbalancedNodeIndex == 0 {
 		parentNodeItemIndex = 0
 	}
-	parentNodeItem := parentNode.items[parentNodeItemIndex]
-	parentNode.items[parentNodeItemIndex] = leftNodeItem
+	parentNodeItem := parentNode.records[parentNodeItemIndex]
+	parentNode.records[parentNodeItemIndex] = leftNodeItem
 
-	unbalancedNode.items = append([]*Item{parentNodeItem}, unbalancedNode.items...)
+	unbalancedNode.records = append([]*util.DataRecord{parentNodeItem}, unbalancedNode.records...)
 
 	if !leftNode.isLeaf() {
 		childToShift := leftNode.children[len(leftNode.children)-1]
@@ -204,17 +206,17 @@ func rotateRight(leftNode *Node, parentNode *Node, unbalancedNode *Node, unbalan
 }
 
 func rotateLeft(unbalancedNode *Node, parentNode *Node, rightNode *Node, unbalancedNodeIndex int) {
-	rightNodeItem := rightNode.items[0]
-	rightNode.items = rightNode.items[1:]
+	rightNodeItem := rightNode.records[0]
+	rightNode.records = rightNode.records[1:]
 
 	parentNodeIndex := unbalancedNodeIndex
-	if parentNodeIndex == len(parentNode.items) {
-		parentNodeIndex = len(parentNode.items) - 1
+	if parentNodeIndex == len(parentNode.records) {
+		parentNodeIndex = len(parentNode.records) - 1
 	}
-	parentNodeItem := parentNode.items[parentNodeIndex]
-	parentNode.items[parentNodeIndex] = rightNodeItem
+	parentNodeItem := parentNode.records[parentNodeIndex]
+	parentNode.records[parentNodeIndex] = rightNodeItem
 
-	unbalancedNode.items = append(unbalancedNode.items, parentNodeItem)
+	unbalancedNode.records = append(unbalancedNode.records, parentNodeItem)
 
 	if !unbalancedNode.isLeaf() {
 		childToShift := rightNode.children[0]
@@ -229,11 +231,11 @@ func merge(parentNode *Node, unbalancedNodeIndex int) {
 	if unbalancedNodeIndex == 0 {
 		rightNode := parentNode.children[unbalancedNodeIndex+1]
 
-		parentNodeItem := parentNode.items[0]
-		parentNode.items = parentNode.items[1:]
-		unbalancedNode.items = append(unbalancedNode.items, parentNodeItem)
+		parentNodeItem := parentNode.records[0]
+		parentNode.records = parentNode.records[1:]
+		unbalancedNode.records = append(unbalancedNode.records, parentNodeItem)
 
-		unbalancedNode.items = append(unbalancedNode.items, rightNode.items...)
+		unbalancedNode.records = append(unbalancedNode.records, rightNode.records...)
 		parentNode.children = append(parentNode.children[0:1], parentNode.children[2:]...)
 
 		if !rightNode.isLeaf() {
@@ -242,11 +244,11 @@ func merge(parentNode *Node, unbalancedNodeIndex int) {
 	} else {
 		leftNode := parentNode.children[unbalancedNodeIndex-1]
 
-		parentNodeItem := parentNode.items[unbalancedNodeIndex-1]
-		parentNode.items = append(parentNode.items[:unbalancedNodeIndex-1], parentNode.items[unbalancedNodeIndex:]...)
-		leftNode.items = append(leftNode.items, parentNodeItem)
+		parentNodeItem := parentNode.records[unbalancedNodeIndex-1]
+		parentNode.records = append(parentNode.records[:unbalancedNodeIndex-1], parentNode.records[unbalancedNodeIndex:]...)
+		leftNode.records = append(leftNode.records, parentNodeItem)
 
-		leftNode.items = append(leftNode.items, unbalancedNode.items...)
+		leftNode.records = append(leftNode.records, unbalancedNode.records...)
 		parentNode.children = append(parentNode.children[:unbalancedNodeIndex], parentNode.children[unbalancedNodeIndex+1:]...)
 
 		if !leftNode.isLeaf() {
@@ -255,33 +257,33 @@ func merge(parentNode *Node, unbalancedNodeIndex int) {
 	}
 }
 
-func (n *Node) addItem(item *Item, index int) int {
-	if len(n.items) == index {
-		n.items = append(n.items, item)
+func (n *Node) addRecord(item *util.DataRecord, index int) int {
+	if len(n.records) == index {
+		n.records = append(n.records, item)
 		return index
 	}
 
-	n.items = append(n.items[:index+1], n.items[index:]...)
-	n.items[index] = item
+	n.records = append(n.records[:index+1], n.records[index:]...)
+	n.records[index] = item
 	return index
 }
 
 // split handles overflow by dividing a node into two nodes.
 func (n *Node) split(modifiedNode *Node, index int) {
-	minSize := n.owner.minItems
+	minSize := n.owner.minRecords
 	childIndex := 0
-	for len(modifiedNode.items) > n.owner.maxItems {
-		middleItem := modifiedNode.items[minSize]
+	for len(modifiedNode.records) > n.owner.maxRecords {
+		middleItem := modifiedNode.records[minSize]
 		var newNode *Node
 		if modifiedNode.isLeaf() {
-			newNode = NewNode(n.owner, modifiedNode.items[minSize+1:], []*Node{})
-			modifiedNode.items = modifiedNode.items[:minSize]
+			newNode = NewNode(n.owner, modifiedNode.records[minSize+1:], []*Node{})
+			modifiedNode.records = modifiedNode.records[:minSize]
 		} else {
-			newNode = NewNode(n.owner, modifiedNode.items[minSize+1:], modifiedNode.children[childIndex+1:])
-			modifiedNode.items = modifiedNode.items[:minSize]
+			newNode = NewNode(n.owner, modifiedNode.records[minSize+1:], modifiedNode.children[childIndex+1:])
+			modifiedNode.records = modifiedNode.records[:minSize]
 			modifiedNode.children = modifiedNode.children[:minSize+1]
 		}
-		n.addItem(middleItem, index)
+		n.addRecord(middleItem, index)
 		if len(n.children) == index+1 {
 			n.children = append(n.children, newNode)
 		} else {
@@ -292,10 +294,6 @@ func (n *Node) split(modifiedNode *Node, index int) {
 		childIndex += 1
 		modifiedNode = newNode
 	}
-}
-
-func newItem(key string, value []byte) *Item {
-	return &Item{key: key, value: value}
 }
 
 func (n *Node) isLeaf() bool {
