@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"nasp-project/structures/item"
+	"nasp-project/util"
 	"strings"
 )
 
 type skipListNode struct {
 	next, down *skipListNode
-	item       *item.Item
+	record     *util.DataRecord
 }
 
 type SkipList struct {
@@ -36,16 +36,16 @@ func NewSkipList(maxSize uint32, maxHeight uint32) *SkipList {
 // HasKey checks if the specified key is in the skip list.
 func (sl *SkipList) HasKey(key string) bool {
 	resultNode := sl.searchForKey(key)
-	return resultNode.item != nil && resultNode.item.Key == key
+	return resultNode.record != nil && string(resultNode.record.Key) == key
 }
 
 // Get returns the value of the item with the specified key if present. If not, returns an error.
-func (sl *SkipList) Get(key string) ([]byte, error) {
-	resultNode := sl.searchForKey(key)
-	if resultNode.item != nil && resultNode.item.Key == key {
-		return resultNode.item.Value, nil
+func (sl *SkipList) Get(key []byte) (*util.DataRecord, error) {
+	resultNode := sl.searchForKey(string(key))
+	if resultNode.record != nil && string(resultNode.record.Key) == string(key) {
+		return resultNode.record, nil
 	} else {
-		return nil, errors.New("error: failed to get key " + key + ", it's not in the skip list")
+		return nil, errors.New("error: failed to get key " + string(key) + ", it's not in the skip list")
 	}
 }
 
@@ -53,8 +53,8 @@ func (sl *SkipList) Get(key string) ([]byte, error) {
 // present.
 func (sl *SkipList) Update(key string, value []byte) error {
 	resultNode := sl.searchForKey(key)
-	if resultNode.item != nil && resultNode.item.Key == key {
-		resultNode.item.Value = value
+	if resultNode.record != nil && string(resultNode.record.Key) == string(key) {
+		resultNode.record.Value = value
 		return nil
 	} else {
 		return errors.New("error: failed to update element with key " + key + ", it's not in the skip list")
@@ -67,7 +67,7 @@ func (sl *SkipList) Size() uint32 {
 
 // Add attempts to add a new item to the skip list. If they key is already present, updates the item.
 // Returns error if the list is full.
-func (sl *SkipList) Add(key string, value []byte) error {
+func (sl *SkipList) Add(record *util.DataRecord) error {
 	/*   x     o
 		 x  x  o
 		 o ox oo
@@ -78,17 +78,22 @@ func (sl *SkipList) Add(key string, value []byte) error {
 	//   x's. The rightmost x's in each row are the ones who may point to our new element, depending on the height of
 	//   the new column. We will do the search twice, redirecting nodes on the second go.
 
-	resultNode := sl.searchForKey(key)
-	if resultNode.item != nil && resultNode.item.Key == key { // The key is already present, so we update it instead.
-		resultNode.item.Key = key
-		resultNode.item.Value = value
+	resultNode := sl.searchForKey(string(record.Key))
+	if resultNode.record != nil && string(resultNode.record.Key) == string(record.Key) { // The key is already present, so we update it instead.
+		resultNode.record = record
 		return nil
 	}
 	if sl.size == sl.maxSize {
-		return errors.New("error: failed to add item with key " + key + ", skip list is full")
+		return errors.New("error: failed to add item with key " + string(record.Key) + ", skip list is full")
 	}
 	sl.size++
-	newItem := &item.Item{Key: key, Value: value}
+	newItem := &util.DataRecord{
+		CRC:       record.CRC,
+		Tombstone: record.Tombstone,
+		Key:       record.Key,
+		Value:     record.Value,
+		Timestamp: record.Timestamp,
+	}
 
 	var newHeight uint32 = 1
 	// We go to maxHeight-1, because then the first column will be at maxHeight
@@ -105,7 +110,7 @@ func (sl *SkipList) Add(key string, value []byte) error {
 	currentNode := sl.head
 	var lastAddedNode *skipListNode = nil // keeping track of the last added node se we can redirect its down pointer.
 	for {
-		if currentNode.next == nil || key < currentNode.next.item.Key {
+		if currentNode.next == nil || string(record.Key) < string(currentNode.next.record.Key) {
 			if currentHeight <= newHeight { // we are adding a new node
 				currentNode.next = &skipListNode{currentNode.next, nil, newItem}
 				if lastAddedNode != nil {
@@ -128,31 +133,35 @@ func (sl *SkipList) Add(key string, value []byte) error {
 	return nil
 }
 
+func (sl *SkipList) Flush() []*util.DataRecord {
+	return nil
+}
+
 // Print the skip list
 func (sl *SkipList) Print() {
 	starterNode := sl.head
 	for starterNode != nil {
 		currentNode := starterNode
 		for currentNode != nil {
-			if currentNode.item == nil {
+			if currentNode.record == nil {
 				fmt.Print("nil->")
 			} else {
-				fmt.Print(currentNode.item.Key + "->")
+				fmt.Print(string(currentNode.record.Key) + "->")
 			}
 			if currentNode.down != nil { // find how far the next node is to print spaces
 				lowestNode := currentNode.down // we need the lowest layer because it's always filled
 				for lowestNode.down != nil {
 					lowestNode = lowestNode.down
 				}
-				if currentNode.next == nil || currentNode.next.item == nil {
+				if currentNode.next == nil || currentNode.next.record == nil {
 					for lowestNode.next != nil {
 						lowestNode = lowestNode.next
-						print(strings.Repeat(" ", 2+len(lowestNode.item.Key)))
+						print(strings.Repeat(" ", 2+len(lowestNode.record.Key)))
 					}
 				} else {
-					for lowestNode.next.item != currentNode.next.item {
+					for lowestNode.next.record != currentNode.next.record {
 						lowestNode = lowestNode.next
-						print(strings.Repeat(" ", 2+len(lowestNode.item.Key)))
+						print(strings.Repeat(" ", 2+len(lowestNode.record.Key)))
 					}
 				}
 			}
@@ -164,19 +173,19 @@ func (sl *SkipList) Print() {
 }
 
 // Delete attempts to delete the item with the specified key from the skip list. Returns error if it's not present.
-func (sl *SkipList) Delete(key string) error {
-	resultNode := sl.searchForKey(key)
-	if resultNode.item == nil || resultNode.item.Key != key {
-		return errors.New("error: failed to delete key" + key + ", it's not in the skip list")
+func (sl *SkipList) Delete(key []byte) error {
+	resultNode := sl.searchForKey(string(key))
+	if resultNode.record == nil || string(resultNode.record.Key) != string(key) {
+		return errors.New("error: failed to delete key" + string(key) + ", it's not in the skip list")
 	} else {
 		currentNode := sl.head
 		for { // This for loop is structured a bit differently than other searches because we know the key is present.
 			if currentNode.next == nil {
 				currentNode = currentNode.down
-			} else if key <= currentNode.next.item.Key {
-				if key == currentNode.next.item.Key {
+			} else if string(key) <= string(currentNode.next.record.Key) {
+				if string(key) == string(currentNode.next.record.Key) {
 					currentNode.next.down = nil
-					currentNode.next.item = nil
+					currentNode.next.record = nil
 					currentNode.next = currentNode.next.next // The garbage collector will delete the old node
 				}
 				if currentNode.down == nil { // we reached the bottom
@@ -200,7 +209,7 @@ func (sl *SkipList) Delete(key string) error {
 func (sl *SkipList) searchForKey(key string) *skipListNode {
 	currentNode := sl.head
 	for {
-		if currentNode.next == nil || key < currentNode.next.item.Key {
+		if currentNode.next == nil || key < string(currentNode.next.record.Key) {
 			if currentNode.down == nil { // we reached the bottom
 				break
 			}

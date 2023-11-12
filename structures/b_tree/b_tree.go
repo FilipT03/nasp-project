@@ -33,17 +33,16 @@ func NewBTree(minRecords int) *BTree {
 }
 
 // Get searches for a key in the B-tree and returns an error if the key is not found.
-func (bt *BTree) Get(key string) (*util.DataRecord, error) {
-	index, node, _ := bt.findKey(key, true)
+func (bt *BTree) Get(key []byte) (*util.DataRecord, error) {
+	index, node, _ := bt.findKey(string(key), true)
 	if index == -1 {
-		return nil, errors.New("error: key '" + key + "' not found in B-tree")
+		return nil, errors.New("error: key '" + string(key) + "' not found in B-tree")
 	}
 	return node.records[index], nil
 }
 
 // Add a new record to the B-tree while handling overflows.
-func (bt *BTree) Add(key string, value []byte) error {
-	record := util.NewRecord([]byte(key), value)
+func (bt *BTree) Add(record *util.DataRecord) error {
 	index, nodeToInsert, ancestors := bt.findKey(string(record.Key), false)
 	nodeToInsert.addRecord(record, index)
 	nodePath := bt.getPath(ancestors)
@@ -65,11 +64,27 @@ func (bt *BTree) Add(key string, value []byte) error {
 	return nil
 }
 
-// Delete removes a key from the BTree. It returns an error if the key is not found.
-func (bt *BTree) Delete(key string) error {
-	index, nodeToDeleteFrom, ancestorsIndexes := bt.findKey(key, true)
+// Delete marks a record as deleted by setting its tombstone to true.
+// Returns an error if the key is not found or is already marked as deleted.
+// Use Remove to delete key from the B tree.
+func (bt *BTree) Delete(key []byte) error {
+	index, nodeToInsert, _ := bt.findKey(string(key), false)
 	if index == -1 {
-		return errors.New("error: could not delete key '" + key + "' as it does not exist B-tree")
+		return errors.New("error: could not delete key '" + string(key) + "' as it does not exist B-tree")
+	}
+	if nodeToInsert.records[index].Tombstone {
+		return errors.New("error: could not delete key '" + string(key) + "' as it is already deleted")
+	}
+	nodeToInsert.records[index].Tombstone = true
+	return nil
+}
+
+// Remove deletes a key from the BTree. Returns an error if the key is not found.
+// For logical deletion, use Delete.
+func (bt *BTree) Remove(record *util.DataRecord) error {
+	index, nodeToDeleteFrom, ancestorsIndexes := bt.findKey(string(record.Key), true)
+	if index == -1 {
+		return errors.New("error: could not delete key '" + string(record.Key) + "' as it does not exist B-tree")
 	}
 	if nodeToDeleteFrom.isLeaf() {
 		nodeToDeleteFrom.records = append(nodeToDeleteFrom.records[:index], nodeToDeleteFrom.records[index+1:]...)
@@ -102,6 +117,11 @@ func (bt *BTree) Delete(key string) error {
 		bt.root = bt.root.children[len(bt.root.children)-1]
 	}
 
+	return nil
+}
+
+// Flush  returns sorted record in B tree
+func (bt *BTree) Flush() []*util.DataRecord {
 	return nil
 }
 

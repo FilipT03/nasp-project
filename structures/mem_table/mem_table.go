@@ -1,7 +1,7 @@
 package mem_table
 
 import (
-	"log/slog"
+	"log"
 	"nasp-project/structures/b_tree"
 	"nasp-project/structures/hash_map"
 	"nasp-project/structures/skip_list"
@@ -9,13 +9,14 @@ import (
 )
 
 type MemTableStructure interface {
-	Add(key string, value []byte) error
-	Delete(key string) error
-	Get(key string) ([]byte, error)
+	Add(record *util.DataRecord) error
+	Delete(key []byte) error
+	Get(key []byte) (*util.DataRecord, error)
+	Flush() []*util.DataRecord
 }
 
 type MemTable struct {
-	Structure MemTableStructure
+	structure MemTableStructure
 }
 
 func NewMemTable() *MemTable {
@@ -25,33 +26,33 @@ func NewMemTable() *MemTable {
 	switch structure {
 	case "BTree":
 		return &MemTable{
-			Structure: b_tree.NewBTree(config.MemTable.BTree.MinSize),
+			structure: b_tree.NewBTree(config.MemTable.BTree.MinSize),
 		}
 	case "SkipList":
 		return &MemTable{
-			Structure: skip_list.NewSkipList(uint32(config.MemTable.MaxSize), uint32(config.MemTable.SkipList.MaxHeight)),
+			structure: skip_list.NewSkipList(uint32(config.MemTable.MaxSize), uint32(config.MemTable.SkipList.MaxHeight)),
 		}
 	case "HashMap":
 		return &MemTable{
-			Structure: hash_map.NewHashMap(uint32(config.MemTable.MaxSize)),
+			structure: hash_map.NewHashMap(uint32(config.MemTable.MaxSize)),
 		}
 	default:
-		slog.Warn("warning: The memory table structure is invalid. The default structure will be used (SkipList).")
+		log.Print("warning: The memory table structure is invalid. The default structure (SkipList) will be used.")
 		structure = "SkipList"
 		return &MemTable{
-			Structure: skip_list.NewSkipList(uint32(config.MemTable.MaxSize), uint32(config.MemTable.SkipList.MaxHeight)),
+			structure: skip_list.NewSkipList(uint32(config.MemTable.MaxSize), uint32(config.MemTable.SkipList.MaxHeight)),
 		}
 	}
 }
 
-func (mt *MemTable) Add(key string, value []byte) error {
-	return nil
+func (mt *MemTable) Add(record *util.DataRecord) error {
+	return mt.structure.Add(record)
 }
 
-func (mt *MemTable) Delete(key string) error {
-	return nil
+func (mt *MemTable) Delete(key []byte) error {
+	return mt.structure.Delete(key)
 }
 
-func (mt *MemTable) Flush() error {
-	return nil
+func (mt *MemTable) Flush() []*util.DataRecord {
+	return mt.structure.Flush()
 }
