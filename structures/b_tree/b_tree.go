@@ -5,8 +5,6 @@ import (
 	"nasp-project/util"
 )
 
-// TODO: Add BTree size and capacity
-
 type Node struct {
 	owner    *BTree
 	records  []*util.DataRecord
@@ -29,6 +27,8 @@ func NewBTree(minRecords int) *BTree {
 	owner.root.owner = owner
 	owner.minRecords = minRecords
 	owner.maxRecords = 2 * minRecords
+	owner.capacity = uint32(util.GetConfig().MemTable.MaxSize)
+	owner.size = 0
 	return owner
 }
 
@@ -44,7 +44,10 @@ func (bt *BTree) Get(key []byte) (*util.DataRecord, error) {
 // Add a new record to the B-tree while handling overflows.
 func (bt *BTree) Add(record *util.DataRecord) error {
 	index, nodeToInsert, ancestors := bt.findKey(string(record.Key), false)
-	nodeToInsert.addRecord(record, index)
+	_, err := nodeToInsert.addRecord(record, index)
+	if err != nil {
+		return err
+	}
 	nodePath := bt.getPath(ancestors)
 
 	for i := len(nodePath) - 2; i >= 0; i-- {
@@ -61,6 +64,7 @@ func (bt *BTree) Add(record *util.DataRecord) error {
 		newRoot.split(bt.root, 0)
 		bt.root = newRoot
 	}
+
 	return nil
 }
 
@@ -76,6 +80,7 @@ func (bt *BTree) Delete(key []byte) error {
 		return errors.New("error: could not delete key '" + string(key) + "' as it is already deleted")
 	}
 	nodeToInsert.records[index].Tombstone = true
+	bt.size--
 	return nil
 }
 
@@ -117,6 +122,7 @@ func (bt *BTree) Remove(record *util.DataRecord) error {
 		bt.root = bt.root.children[len(bt.root.children)-1]
 	}
 
+	bt.size--
 	return nil
 }
 
@@ -277,15 +283,27 @@ func merge(parentNode *Node, unbalancedNodeIndex int) {
 	}
 }
 
-func (n *Node) addRecord(item *util.DataRecord, index int) int {
+func (n *Node) addRecord(record *util.DataRecord, index int) (int, error) {
+	if len(n.records) != 0 && string(n.records[index].Key) == string(record.Key) {
+		n.records[index] = record
+		return index, nil
+	}
+
+	if n.owner.size == n.owner.capacity {
+		return -1, errors.New("error: failed to add item with key " + string(record.Key) + ", skip list is full")
+	}
+
 	if len(n.records) == index {
-		n.records = append(n.records, item)
-		return index
+		n.records = append(n.records, record)
+		n.owner.size++
+		return index, nil
 	}
 
 	n.records = append(n.records[:index+1], n.records[index:]...)
-	n.records[index] = item
-	return index
+	n.records[index] = record
+	n.owner.size++
+
+	return index, nil
 }
 
 // split handles overflow by dividing a node into two nodes.
@@ -303,7 +321,7 @@ func (n *Node) split(modifiedNode *Node, index int) {
 			modifiedNode.records = modifiedNode.records[:minSize]
 			modifiedNode.children = modifiedNode.children[:minSize+1]
 		}
-		n.addRecord(middleItem, index)
+		_, _ = n.addRecord(middleItem, index)
 		if len(n.children) == index+1 {
 			n.children = append(n.children, newNode)
 		} else {
