@@ -8,24 +8,22 @@ import (
 	"nasp-project/util"
 )
 
-type DataRecord struct {
-	Tombstone bool
-	Key       []byte
-	Value     []byte
-	Timestamp int64
-}
-
 type MemTableStructure interface {
-	Add(record *DataRecord) error
+	// Add record to structure. Returns error if structure is full.
+	Add(record *util.DataRecord) error
+	// Delete record from structure. Returns error if key does not exist.
 	Delete(key []byte) error
-	Get(key []byte) (*DataRecord, error)
-	Flush() []*DataRecord
+	// Get key from structure. Return error if key does not exist.
+	Get(key []byte) (*util.DataRecord, error)
+	// Flush returns sorted records and deletes table.
+	Flush() []*util.DataRecord
 }
 
 type MemTable struct {
 	structure MemTableStructure
 }
 
+// NewMemTable creates an instance of MemTable. Creates Skip List if structure is not defined.
 func NewMemTable() *MemTable {
 	config := util.GetConfig()
 	structure := config.MemTable.Structure
@@ -52,7 +50,7 @@ func NewMemTable() *MemTable {
 	}
 }
 
-func (mt *MemTable) Add(record *DataRecord) error {
+func (mt *MemTable) Add(record *util.DataRecord) error {
 	return mt.structure.Add(record)
 }
 
@@ -60,6 +58,6 @@ func (mt *MemTable) Delete(key []byte) error {
 	return mt.structure.Delete(key)
 }
 
-func (mt *MemTable) Flush() []*DataRecord {
+func (mt *MemTable) Flush() []*util.DataRecord {
 	return mt.structure.Flush()
 }

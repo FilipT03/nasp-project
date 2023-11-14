@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"nasp-project/structures/mem_table"
+	"nasp-project/util"
 	"strings"
 )
 
 type skipListNode struct {
 	next, down *skipListNode
-	record     *mem_table.DataRecord
+	record     *util.DataRecord
 }
 
 type SkipList struct {
@@ -40,7 +40,7 @@ func (sl *SkipList) HasKey(key string) bool {
 }
 
 // Get returns the value of the item with the specified key if present. If not, returns an error.
-func (sl *SkipList) Get(key []byte) (*mem_table.DataRecord, error) {
+func (sl *SkipList) Get(key []byte) (*util.DataRecord, error) {
 	resultNode := sl.searchForKey(string(key))
 	if resultNode.record != nil && string(resultNode.record.Key) == string(key) {
 		return resultNode.record, nil
@@ -67,7 +67,7 @@ func (sl *SkipList) Size() uint32 {
 
 // Add attempts to add a new item to the skip list. If they key is already present, updates the item.
 // Returns error if the list is full.
-func (sl *SkipList) Add(record *mem_table.DataRecord) error {
+func (sl *SkipList) Add(record *util.DataRecord) error {
 	/*   x     o
 		 x  x  o
 		 o ox oo
@@ -87,7 +87,7 @@ func (sl *SkipList) Add(record *mem_table.DataRecord) error {
 		return errors.New("error: failed to add item with key " + string(record.Key) + ", skip list is full")
 	}
 	sl.size++
-	newItem := &mem_table.DataRecord{
+	newRecord := &util.DataRecord{
 		Tombstone: record.Tombstone,
 		Key:       record.Key,
 		Value:     record.Value,
@@ -111,7 +111,7 @@ func (sl *SkipList) Add(record *mem_table.DataRecord) error {
 	for {
 		if currentNode.next == nil || string(record.Key) < string(currentNode.next.record.Key) {
 			if currentHeight <= newHeight { // we are adding a new node
-				currentNode.next = &skipListNode{currentNode.next, nil, newItem}
+				currentNode.next = &skipListNode{currentNode.next, nil, newRecord}
 				if lastAddedNode != nil {
 					lastAddedNode.down = currentNode.next
 				}
@@ -132,7 +132,14 @@ func (sl *SkipList) Add(record *mem_table.DataRecord) error {
 	return nil
 }
 
-func (sl *SkipList) Flush() []*mem_table.DataRecord {
+func (sl *SkipList) Flush() []*util.DataRecord {
+	records := make([]*util.DataRecord, util.GetConfig().MemTable.MaxSize)
+	currentNode := sl.head
+
+	fmt.Println(currentNode)
+
+	_ = records
+
 	return nil
 }
 
