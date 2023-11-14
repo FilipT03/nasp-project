@@ -133,14 +133,21 @@ func (sl *SkipList) Add(record *util.DataRecord) error {
 }
 
 func (sl *SkipList) Flush() []*util.DataRecord {
-	records := make([]*util.DataRecord, util.GetConfig().MemTable.MaxSize)
-	currentNode := sl.head
+	var records []*util.DataRecord
+	starterNode := sl.head
+	height := sl.height
 
-	fmt.Println(currentNode)
+	for height != 1 {
+		starterNode = starterNode.down
+		height--
+	}
 
-	_ = records
+	for starterNode.next != nil {
+		records = append(records, starterNode.next.record)
+		starterNode = starterNode.next
+	}
 
-	return nil
+	return records
 }
 
 // Print the skip list
