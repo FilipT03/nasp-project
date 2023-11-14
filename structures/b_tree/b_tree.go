@@ -2,12 +2,13 @@ package b_tree
 
 import (
 	"errors"
+	"nasp-project/structures/mem_table"
 	"nasp-project/util"
 )
 
 type Node struct {
 	owner    *BTree
-	records  []*util.DataRecord
+	records  []*mem_table.DataRecord
 	children []*Node
 }
 
@@ -33,7 +34,7 @@ func NewBTree(minRecords int) *BTree {
 }
 
 // Get searches for a key in the B-tree and returns an error if the key is not found.
-func (bt *BTree) Get(key []byte) (*util.DataRecord, error) {
+func (bt *BTree) Get(key []byte) (*mem_table.DataRecord, error) {
 	index, node, _ := bt.findKey(string(key), true)
 	if index == -1 {
 		return nil, errors.New("error: key '" + string(key) + "' not found in B-tree")
@@ -42,7 +43,7 @@ func (bt *BTree) Get(key []byte) (*util.DataRecord, error) {
 }
 
 // Add a new record to the B-tree while handling overflows.
-func (bt *BTree) Add(record *util.DataRecord) error {
+func (bt *BTree) Add(record *mem_table.DataRecord) error {
 	index, nodeToInsert, ancestors := bt.findKey(string(record.Key), false)
 	_, err := nodeToInsert.addRecord(record, index)
 	if err != nil {
@@ -60,7 +61,7 @@ func (bt *BTree) Add(record *util.DataRecord) error {
 	}
 
 	if len(bt.root.records) > bt.maxRecords {
-		newRoot := NewNode(bt, []*util.DataRecord{}, []*Node{bt.root})
+		newRoot := NewNode(bt, []*mem_table.DataRecord{}, []*Node{bt.root})
 		newRoot.split(bt.root, 0)
 		bt.root = newRoot
 	}
@@ -86,7 +87,7 @@ func (bt *BTree) Delete(key []byte) error {
 
 // Remove deletes a key from the BTree. Returns an error if the key is not found.
 // For logical deletion, use Delete.
-func (bt *BTree) Remove(record *util.DataRecord) error {
+func (bt *BTree) Remove(record *mem_table.DataRecord) error {
 	index, nodeToDeleteFrom, ancestorsIndexes := bt.findKey(string(record.Key), true)
 	if index == -1 {
 		return errors.New("error: could not delete key '" + string(record.Key) + "' as it does not exist B-tree")
@@ -127,11 +128,11 @@ func (bt *BTree) Remove(record *util.DataRecord) error {
 }
 
 // Flush  returns sorted record in B tree
-func (bt *BTree) Flush() []*util.DataRecord {
+func (bt *BTree) Flush() []*mem_table.DataRecord {
 	return nil
 }
 
-func NewNode(owner *BTree, items []*util.DataRecord, children []*Node) *Node {
+func NewNode(owner *BTree, items []*mem_table.DataRecord, children []*Node) *Node {
 	return &Node{
 		owner:    owner,
 		records:  items,
@@ -222,7 +223,7 @@ func rotateRight(leftNode *Node, parentNode *Node, unbalancedNode *Node, unbalan
 	parentNodeItem := parentNode.records[parentNodeItemIndex]
 	parentNode.records[parentNodeItemIndex] = leftNodeItem
 
-	unbalancedNode.records = append([]*util.DataRecord{parentNodeItem}, unbalancedNode.records...)
+	unbalancedNode.records = append([]*mem_table.DataRecord{parentNodeItem}, unbalancedNode.records...)
 
 	if !leftNode.isLeaf() {
 		childToShift := leftNode.children[len(leftNode.children)-1]
@@ -283,7 +284,7 @@ func merge(parentNode *Node, unbalancedNodeIndex int) {
 	}
 }
 
-func (n *Node) addRecord(record *util.DataRecord, index int) (int, error) {
+func (n *Node) addRecord(record *mem_table.DataRecord, index int) (int, error) {
 	if len(n.records) != 0 && string(n.records[index].Key) == string(record.Key) {
 		n.records[index] = record
 		return index, nil

@@ -8,11 +8,18 @@ import (
 	"nasp-project/util"
 )
 
+type DataRecord struct {
+	Tombstone bool
+	Key       []byte
+	Value     []byte
+	Timestamp int64
+}
+
 type MemTableStructure interface {
-	Add(record *util.DataRecord) error
+	Add(record *DataRecord) error
 	Delete(key []byte) error
-	Get(key []byte) (*util.DataRecord, error)
-	Flush() []*util.DataRecord
+	Get(key []byte) (*DataRecord, error)
+	Flush() []*DataRecord
 }
 
 type MemTable struct {
@@ -45,7 +52,7 @@ func NewMemTable() *MemTable {
 	}
 }
 
-func (mt *MemTable) Add(record *util.DataRecord) error {
+func (mt *MemTable) Add(record *DataRecord) error {
 	return mt.structure.Add(record)
 }
 
@@ -53,6 +60,6 @@ func (mt *MemTable) Delete(key []byte) error {
 	return mt.structure.Delete(key)
 }
 
-func (mt *MemTable) Flush() []*util.DataRecord {
+func (mt *MemTable) Flush() []*DataRecord {
 	return mt.structure.Flush()
 }
