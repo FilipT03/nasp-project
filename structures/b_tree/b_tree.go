@@ -2,6 +2,7 @@ package b_tree
 
 import (
 	"errors"
+	"fmt"
 	"nasp-project/util"
 )
 
@@ -80,16 +81,15 @@ func (bt *BTree) Delete(key []byte) error {
 		return errors.New("error: could not delete key '" + string(key) + "' as it is already deleted")
 	}
 	nodeToInsert.records[index].Tombstone = true
-	bt.size--
 	return nil
 }
 
 // Remove deletes a key from the BTree. Returns an error if the key is not found.
 // For logical deletion, use Delete.
-func (bt *BTree) Remove(record *util.DataRecord) error {
-	index, nodeToDeleteFrom, ancestorsIndexes := bt.findKey(string(record.Key), true)
+func (bt *BTree) Remove(key []byte) error {
+	index, nodeToDeleteFrom, ancestorsIndexes := bt.findKey(string(key), true)
 	if index == -1 {
-		return errors.New("error: could not delete key '" + string(record.Key) + "' as it does not exist B-tree")
+		return errors.New("error: could not delete key '" + string(key) + "' as it does not exist B-tree")
 	}
 	if nodeToDeleteFrom.isLeaf() {
 		nodeToDeleteFrom.records = append(nodeToDeleteFrom.records[:index], nodeToDeleteFrom.records[index+1:]...)
@@ -124,6 +124,17 @@ func (bt *BTree) Remove(record *util.DataRecord) error {
 
 	bt.size--
 	return nil
+}
+
+func getSortedNodes(node *Node, records *[]*util.DataRecord) {
+	if !node.isLeaf() {
+		for _, child := range node.children {
+			getSortedNodes(child, records)
+		}
+	}
+	for _, record := range node.records {
+		fmt.Println(string(record.Key))
+	}
 }
 
 // Flush  returns sorted record in B tree
@@ -284,7 +295,7 @@ func merge(parentNode *Node, unbalancedNodeIndex int) {
 }
 
 func (n *Node) addRecord(record *util.DataRecord, index int) (int, error) {
-	if len(n.records) != 0 && string(n.records[index].Key) == string(record.Key) {
+	if index < len(n.records) && n.records[index] != nil {
 		n.records[index] = record
 		return index, nil
 	}
