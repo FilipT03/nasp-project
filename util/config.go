@@ -36,7 +36,8 @@ type SSTableConfig struct {
 }
 
 type LSMTreeConfig struct {
-	MaxLevel int `yaml:"maxLevel"`
+	MaxLevel            int    `yaml:"maxLevel"`
+	CompactionAlgorithm string `yaml:"compactionAlgorithm"`
 }
 
 type CacheConfig struct {

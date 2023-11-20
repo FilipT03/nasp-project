@@ -50,3 +50,14 @@ func Read(key []byte, config *util.Config) (*model.Record, error) {
 	}
 	return nil, nil
 }
+
+// Compact compacts the LSM tree by merging SSTables from the same level.
+// The compaction algorithm used is determined by the config.
+func Compact(config *util.LSMTreeConfig) error {
+	if config.CompactionAlgorithm == "Size-Tiered" {
+		// TODO: Implement
+	} else if config.CompactionAlgorithm == "Leveled" {
+		// TODO: Implement
+	}
+	return nil
+}
