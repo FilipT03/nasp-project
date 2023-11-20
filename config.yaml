@@ -18,6 +18,7 @@ SSTable:
     merkleTreeChunkSize: 1024
 LSMTree:
     maxLevel: 4
+    compactionAlgorithm: Size-Tiered # Size-Tiered, Leveled
 Cache:
     maxSize: 1024
 
