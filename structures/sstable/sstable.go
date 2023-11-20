@@ -458,6 +458,10 @@ func Read(key []byte, config *util.Config) (*DataRecord, error) {
 	return nil, nil
 }
 
+// MergeSSTables merges the given SSTables and writes the result to disk.
+// Removes the input SSTables from disk.
+// Returns the new SSTable.
+// Returns an error if the merge fails.
 func MergeSSTables(sst1, sst2 *SSTable, level int, config util.SSTableConfig) (*SSTable, error) {
 	sstable, err := initializeSSTable(level, config)
 	if err != nil {
