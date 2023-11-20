@@ -3,6 +3,7 @@ package sstable
 import (
 	bytesUtil "bytes"
 	"encoding/binary"
+	"nasp-project/model"
 	"os"
 )
 
@@ -38,6 +39,20 @@ type DataBlock struct {
 	Filename    string // Where the data block is stored
 	StartOffset int64  // Where the data block starts in the file (in bytes)
 	Size        int64  // Size of the data block (in bytes)
+}
+
+func dataRecordsFromRecords(recs []model.Record) []DataRecord {
+	dataRecs := make([]DataRecord, len(recs))
+	for i, rec := range recs {
+		// TODO: Compute CRC
+		dataRecs[i] = DataRecord{
+			Key:       rec.Key,
+			Value:     rec.Value,
+			Tombstone: rec.Tombstone,
+			Timestamp: rec.Timestamp,
+		}
+	}
+	return dataRecs
 }
 
 // Write writes the records to the data block file.
