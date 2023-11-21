@@ -3,6 +3,7 @@ package sstable
 import (
 	"bytes"
 	"fmt"
+	"nasp-project/model"
 	"nasp-project/util"
 	"os"
 	"path/filepath"
@@ -84,11 +85,13 @@ func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
 }
 
 // CreateSSTable creates an SSTable from the given data records and writes it to disk.
-func CreateSSTable(recs []DataRecord, config util.SSTableConfig) (*SSTable, error) {
+func CreateSSTable(records []model.Record, config util.SSTableConfig) (*SSTable, error) {
 	sstable, err := initializeSSTable(1, config) // when creating from memory, always save to the level no 1
 	if err != nil {
 		return nil, err
 	}
+
+	recs := dataRecordsFromRecords(records)
 
 	err = sstable.Data.Write(recs)
 	if err != nil {
@@ -358,7 +361,7 @@ func OpenSSTableFromToc(tocPath string) (*SSTable, error) {
 // Read returns the record with the given key from the SSTable.
 // Returns nil if the key does not exist.
 // Returns an error if the read fails.
-func (sst *SSTable) Read(key []byte) (*DataRecord, error) {
+func (sst *SSTable) Read(key []byte) (*model.Record, error) {
 	if !sst.Filter.HasLoaded() {
 		err := sst.Filter.Load()
 		if err != nil {
@@ -408,54 +411,19 @@ func (sst *SSTable) Read(key []byte) (*DataRecord, error) {
 		return nil, err
 	}
 
-	record, err := sst.Data.GetRecordWithKeyFromOffset(key, ir.Offset)
+	dr, err := sst.Data.GetRecordWithKeyFromOffset(key, ir.Offset)
 	if err != nil {
 		return nil, err
 	}
 
-	return record, nil
-}
+	// TODO: Check CRC
 
-// Read searches the LSM tree for the record with the given key.
-// Returns the record if it is found, nil otherwise.
-// The returned record is from the lowest LSM Tree level that contains the record.
-// If the record is found in multiple same-level SSTables, the record with the latest timestamp is returned.
-// Returns an error if the read fails.
-func Read(key []byte, config *util.Config) (*DataRecord, error) {
-	for lvl := 1; lvl <= config.LSMTree.MaxLevel; lvl++ {
-		lvlLabel := fmt.Sprintf("L%03d", lvl)
-		path := filepath.Join(config.SSTable.SavePath, lvlLabel, "TOC")
-		folder, err := os.ReadDir(path)
-		if err != nil {
-			return nil, err
-		}
-
-		var record *DataRecord = nil
-		for _, file := range folder {
-			if file.IsDir() {
-				continue
-			}
-			table, err := OpenSSTableFromToc(filepath.Join(path, file.Name()))
-			if err != nil {
-				return nil, err
-			}
-			rec, err := table.Read(key)
-			if err != nil {
-				return nil, err
-			}
-			if rec == nil {
-				continue
-			}
-			if record == nil || rec.Timestamp > record.Timestamp {
-				record = rec
-			}
-		}
-
-		if record != nil {
-			return record, nil
-		}
-	}
-	return nil, nil
+	return &model.Record{
+		Key:       dr.Key,
+		Value:     dr.Value,
+		Tombstone: dr.Tombstone,
+		Timestamp: dr.Timestamp,
+	}, nil
 }
 
 // MergeSSTables merges the given SSTables and writes the result to disk.
