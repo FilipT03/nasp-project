@@ -1,6 +1,9 @@
 package token_bucket
 
-import "time"
+import (
+	"encoding/binary"
+	"time"
+)
 
 type TokenBucket struct {
 	maxTokenSize int64
@@ -35,4 +38,24 @@ func Now() int64 {
 }
 func isIntervalOver(time int64) bool {
 	return time <= Now()
+}
+func (TB *TokenBucket) Serialize() []byte {
+	bytes := make([]byte, 32)
+	binary.LittleEndian.PutUint64(bytes[0:8], uint64(TB.maxTokenSize))
+	binary.LittleEndian.PutUint64(bytes[8:16], uint64(TB.tokenCount))
+	binary.LittleEndian.PutUint64(bytes[16:24], uint64(TB.timeInterval))
+	binary.LittleEndian.PutUint64(bytes[24:32], uint64(TB.timeUpdated))
+	return bytes
+}
+func Deserialize(data []byte) *TokenBucket {
+	maxTokenSize := int64(binary.LittleEndian.Uint64(data[0:8]))
+	tokenCount := int64(binary.LittleEndian.Uint64(data[8:16]))
+	timeInterval := int64(binary.LittleEndian.Uint64(data[16:24]))
+	timeUpdated := int64(binary.LittleEndian.Uint64(data[24:32]))
+	return &TokenBucket{
+		maxTokenSize: maxTokenSize,
+		tokenCount:   tokenCount,
+		timeInterval: timeInterval,
+		timeUpdated:  timeUpdated,
+	}
 }

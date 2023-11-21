@@ -1,6 +1,7 @@
 package token_bucket
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
@@ -62,5 +63,21 @@ func TestIsIntervalOver(t *testing.T) {
 
 	if isIntervalOver(futureTime) {
 		t.Errorf("Expected isIntervalOver(%d) to be false, but it was true", futureTime)
+	}
+}
+
+func TestTokenBucketSerialization(t *testing.T) {
+	// Create an instance of TokenBucket
+	tb := NewTokenBucket(10, 1)
+
+	// Serialize the TokenBucket
+	serializedBytes := tb.Serialize()
+
+	// Deserialize the bytes back into a TokenBucket
+	deserializedTB := Deserialize(serializedBytes)
+
+	// Check if the deserialized TokenBucket is equal to the original
+	if !reflect.DeepEqual(tb, deserializedTB) {
+		t.Errorf("Deserialized TokenBucket is not equal to the original.\nOriginal: %+v\nDeserialized: %+v", tb, deserializedTB)
 	}
 }
