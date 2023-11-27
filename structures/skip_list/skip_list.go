@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"nasp-project/util"
+	"nasp-project/model"
 	"strings"
 )
 
 type skipListNode struct {
 	next, down *skipListNode
-	record     *util.DataRecord
+	record     *model.Record
 }
 
 type SkipList struct {
@@ -40,7 +40,7 @@ func (sl *SkipList) HasKey(key string) bool {
 }
 
 // Get returns the value of the item with the specified key if present. If not, returns an error.
-func (sl *SkipList) Get(key []byte) (*util.DataRecord, error) {
+func (sl *SkipList) Get(key []byte) (*model.Record, error) {
 	resultNode := sl.searchForKey(string(key))
 	if resultNode.record != nil && string(resultNode.record.Key) == string(key) {
 		return resultNode.record, nil
@@ -67,7 +67,7 @@ func (sl *SkipList) Size() uint32 {
 
 // Add attempts to add a new item to the skip list. If they key is already present, updates the item.
 // Returns error if the list is full.
-func (sl *SkipList) Add(record *util.DataRecord) error {
+func (sl *SkipList) Add(record *model.Record) error {
 	/*   x     o
 		 x  x  o
 		 o ox oo
@@ -87,7 +87,7 @@ func (sl *SkipList) Add(record *util.DataRecord) error {
 		return errors.New("error: failed to add item with key " + string(record.Key) + ", skip list is full")
 	}
 	sl.size++
-	newRecord := &util.DataRecord{
+	newRecord := &model.Record{
 		Tombstone: record.Tombstone,
 		Key:       record.Key,
 		Value:     record.Value,
@@ -132,8 +132,8 @@ func (sl *SkipList) Add(record *util.DataRecord) error {
 	return nil
 }
 
-func (sl *SkipList) Flush() []*util.DataRecord {
-	var records []*util.DataRecord
+func (sl *SkipList) Flush() []*model.Record {
+	var records []*model.Record
 	starterNode := sl.head
 	height := sl.height
 

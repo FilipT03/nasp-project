@@ -3,12 +3,13 @@ package b_tree
 import (
 	"errors"
 	"fmt"
+	"nasp-project/model"
 	"nasp-project/util"
 )
 
 type Node struct {
 	owner    *BTree
-	records  []*util.DataRecord
+	records  []*model.Record
 	children []*Node
 }
 
@@ -34,7 +35,7 @@ func NewBTree(minRecords int) *BTree {
 }
 
 // Get searches for a key in the B-tree and returns an error if the key is not found.
-func (bt *BTree) Get(key []byte) (*util.DataRecord, error) {
+func (bt *BTree) Get(key []byte) (*model.Record, error) {
 	index, node, _, found := bt.findKey(string(key), true)
 	if !found {
 		return nil, errors.New("error: key '" + string(key) + "' not found in B-tree")
@@ -43,7 +44,7 @@ func (bt *BTree) Get(key []byte) (*util.DataRecord, error) {
 }
 
 // Add a new record to the B-tree while handling overflows.
-func (bt *BTree) Add(record *util.DataRecord) error {
+func (bt *BTree) Add(record *model.Record) error {
 	index, nodeToInsert, ancestors, found := bt.findKey(string(record.Key), false)
 	_, err := nodeToInsert.addRecord(record, index)
 	if err != nil {
@@ -61,7 +62,7 @@ func (bt *BTree) Add(record *util.DataRecord) error {
 	}
 
 	if len(bt.root.records) > bt.maxRecords {
-		newRoot := NewNode(bt, []*util.DataRecord{}, []*Node{bt.root})
+		newRoot := NewNode(bt, []*model.Record{}, []*Node{bt.root})
 		newRoot.split(bt.root, 0)
 		bt.root = newRoot
 	}
@@ -137,12 +138,12 @@ func getSortedNodes(node *Node) {
 }
 
 // Flush  returns sorted record in B tree
-func (bt *BTree) Flush() []*util.DataRecord {
+func (bt *BTree) Flush() []*model.Record {
 	getSortedNodes(bt.root)
 	return nil
 }
 
-func NewNode(owner *BTree, items []*util.DataRecord, children []*Node) *Node {
+func NewNode(owner *BTree, items []*model.Record, children []*Node) *Node {
 	return &Node{
 		owner:    owner,
 		records:  items,
@@ -233,7 +234,7 @@ func rotateRight(leftNode *Node, parentNode *Node, unbalancedNode *Node, unbalan
 	parentNodeItem := parentNode.records[parentNodeItemIndex]
 	parentNode.records[parentNodeItemIndex] = leftNodeItem
 
-	unbalancedNode.records = append([]*util.DataRecord{parentNodeItem}, unbalancedNode.records...)
+	unbalancedNode.records = append([]*model.Record{parentNodeItem}, unbalancedNode.records...)
 
 	if !leftNode.isLeaf() {
 		childToShift := leftNode.children[len(leftNode.children)-1]
@@ -294,7 +295,7 @@ func merge(parentNode *Node, unbalancedNodeIndex int) {
 	}
 }
 
-func (n *Node) addRecord(record *util.DataRecord, index int) (int, error) {
+func (n *Node) addRecord(record *model.Record, index int) (int, error) {
 	if n.owner.size == n.owner.capacity {
 		return -1, errors.New("error: failed to add item with key " + string(record.Key) + ", skip list is full")
 	}

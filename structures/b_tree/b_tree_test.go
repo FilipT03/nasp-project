@@ -1,62 +1,62 @@
 package b_tree
 
 import (
-	"nasp-project/util"
+	"nasp-project/model"
 	"testing"
 )
 
 func TestSize(t *testing.T) {
 	bt := NewBTree(2)
 
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("1"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("1"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("2"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("22"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("1"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("6"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("9"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("69"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("23"),
 		Value:     nil,
@@ -71,49 +71,49 @@ func TestSize(t *testing.T) {
 func TestGet(t *testing.T) {
 	bt := NewBTree(2)
 
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("1"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("2"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("3"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("4"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("5"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("6"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("7"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("8"),
 		Value:     nil,
@@ -146,67 +146,67 @@ func TestGet(t *testing.T) {
 func TestSplit(t *testing.T) {
 	bt := NewBTree(3)
 
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("2"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("5"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("9"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("7"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("3"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("8"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("A"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("D"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("B"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("E"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("F"),
 		Value:     nil,
@@ -264,49 +264,49 @@ func TestSplit(t *testing.T) {
 func TestLeftRotation(t *testing.T) {
 	bt := NewBTree(3)
 
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("2"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("4"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("8"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("9"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("A"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("C"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("E"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("H"),
 		Value:     nil,
@@ -341,43 +341,43 @@ func TestLeftRotation(t *testing.T) {
 func TestMergeHeightLoss(t *testing.T) {
 	bt := NewBTree(3)
 
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("2"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("9"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("4"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("8"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("A"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("C"),
 		Value:     nil,
 		Timestamp: 0,
 	})
-	_ = bt.Add(&util.DataRecord{
+	_ = bt.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("G"),
 		Value:     nil,

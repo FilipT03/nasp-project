@@ -2,6 +2,7 @@ package memtable
 
 import (
 	"log"
+	"nasp-project/model"
 	"nasp-project/structures/b_tree"
 	"nasp-project/structures/hash_map"
 	"nasp-project/structures/skip_list"
@@ -10,21 +11,21 @@ import (
 
 type memtableStructure interface {
 	// Add record to structure. Returns error if structure is full.
-	Add(record *util.DataRecord) error
+	Add(record *model.Record) error
 	// Delete record from structure. Returns error if key does not exist.
 	Delete(key []byte) error
 	// Get key from structure. Return error if key does not exist.
-	Get(key []byte) (*util.DataRecord, error)
+	Get(key []byte) (*model.Record, error)
 	// Flush returns sorted records and deletes table.
-	Flush() []*util.DataRecord
+	Flush() []*model.Record
 }
 
 type Memtable struct {
 	structure memtableStructure
 }
 
-// NewMemTable creates an instance of Memtable. Creates Skip List if structure is not defined.
-func NewMemTable() *Memtable {
+// NewMemtable creates an instance of Memtable. Creates Skip List if structure is not defined.
+func NewMemtable() *Memtable {
 	config := util.GetConfig()
 	structure := config.MemTable.Structure
 
@@ -50,7 +51,7 @@ func NewMemTable() *Memtable {
 	}
 }
 
-func (mt *Memtable) Add(record *util.DataRecord) error {
+func (mt *Memtable) Add(record *model.Record) error {
 	return mt.structure.Add(record)
 }
 
@@ -58,10 +59,10 @@ func (mt *Memtable) Delete(key []byte) error {
 	return mt.structure.Delete(key)
 }
 
-func (mt *Memtable) Flush() []*util.DataRecord {
+func (mt *Memtable) Flush() []*model.Record {
 	return mt.structure.Flush()
 }
 
-func (mt *Memtable) Get(key []byte) (*util.DataRecord, error) {
+func (mt *Memtable) Get(key []byte) (*model.Record, error) {
 	return mt.structure.Get(key)
 }

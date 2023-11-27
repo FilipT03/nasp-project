@@ -2,20 +2,20 @@ package hash_map
 
 import (
 	"errors"
-	"nasp-project/util"
+	"nasp-project/model"
 	"sort"
 )
 
 type HashMap struct {
-	data     map[string]*util.DataRecord
+	data     map[string]*model.Record
 	capacity uint32
 }
 
 func NewHashMap(capacity uint32) *HashMap {
-	return &HashMap{data: make(map[string]*util.DataRecord), capacity: capacity}
+	return &HashMap{data: make(map[string]*model.Record), capacity: capacity}
 }
 
-func (hm *HashMap) Add(record *util.DataRecord) error {
+func (hm *HashMap) Add(record *model.Record) error {
 	if int(hm.capacity) == len(hm.data) {
 		return errors.New("error: hashmap is full")
 	}
@@ -32,7 +32,7 @@ func (hm *HashMap) Delete(key []byte) error {
 	return nil
 }
 
-func (hm *HashMap) Get(key []byte) (*util.DataRecord, error) {
+func (hm *HashMap) Get(key []byte) (*model.Record, error) {
 	if _, ok := hm.data[string(key)]; ok {
 		return nil, nil
 	} else {
@@ -40,18 +40,18 @@ func (hm *HashMap) Get(key []byte) (*util.DataRecord, error) {
 	}
 }
 
-func (hm *HashMap) Flush() []*util.DataRecord {
+func (hm *HashMap) Flush() []*model.Record {
 	keys := make([]string, 0, hm.capacity)
 	for k, _ := range hm.data {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	records := make([]*util.DataRecord, hm.capacity)
+	records := make([]*model.Record, hm.capacity)
 
 	for _, k := range keys {
 		records = append(records, hm.data[k])
 	}
 
-	hm.data = make(map[string]*util.DataRecord)
+	hm.data = make(map[string]*model.Record)
 	return records
 }
