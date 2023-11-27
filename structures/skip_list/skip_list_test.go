@@ -1,7 +1,7 @@
 package skip_list
 
 import (
-	"nasp-project/util"
+	"nasp-project/model"
 	"testing"
 )
 
@@ -9,7 +9,7 @@ func TestAddAndDelete(t *testing.T) {
 	sl := NewSkipList(100, 20)
 	keys := []string{"key1", "key2", "key3", "key4", "key5"}
 	for _, key := range keys {
-		err := sl.Add(&util.Record{
+		err := sl.Add(&model.Record{
 			Tombstone: false,
 			Key:       []byte(key),
 			Value:     nil,
@@ -47,7 +47,7 @@ func TestMaxSize(t *testing.T) {
 	sl := NewSkipList(4, 20)
 	keys := []string{"key1", "key2", "key3", "key4"}
 	for _, key := range keys {
-		err := sl.Add(&util.Record{
+		err := sl.Add(&model.Record{
 			Tombstone: false,
 			Key:       []byte(key),
 			Value:     nil,
@@ -57,7 +57,7 @@ func TestMaxSize(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	err := sl.Add(&util.Record{
+	err := sl.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("key5"),
 		Value:     nil,
@@ -72,7 +72,7 @@ func TestMaxSize(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = sl.Add(&util.Record{
+	err = sl.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("key5"),
 		Value:     nil,
@@ -82,7 +82,7 @@ func TestMaxSize(t *testing.T) {
 		t.Error("Failed to add new key even though there is enough space")
 	}
 
-	err = sl.Add(&util.Record{
+	err = sl.Add(&model.Record{
 		Tombstone: false,
 		Key:       []byte("key1"),
 		Value:     nil,

@@ -2,7 +2,6 @@ package b_tree
 
 import (
 	"errors"
-	"fmt"
 	"nasp-project/model"
 	"nasp-project/util"
 )
@@ -130,17 +129,23 @@ func (bt *BTree) Remove(key []byte) error {
 	return nil
 }
 
-func getSortedNodes(node *Node) {
-	for _, child := range node.children {
-		getSortedNodes(child)
-		fmt.Println(child)
+func sort(node *Node) (slice []*model.Record) {
+	if node.isLeaf() {
+		slice = append(slice, node.records...)
+		return
 	}
+	for i, child := range node.children {
+		slice = append(slice, sort(child)...)
+		if i < len(node.children)-1 {
+			slice = append(slice, node.records[i])
+		}
+	}
+	return
 }
 
-// Flush  returns sorted record in B tree
+// Flush returns sorted records in B tree.
 func (bt *BTree) Flush() []*model.Record {
-	getSortedNodes(bt.root)
-	return nil
+	return sort(bt.root)
 }
 
 func NewNode(owner *BTree, items []*model.Record, children []*Node) *Node {
