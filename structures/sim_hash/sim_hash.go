@@ -12,7 +12,7 @@ import (
 var seededHash = hash.NewSeededHash(14_02_2003)
 
 // Regular expression to separate words from text.
-var wordsRe = regexp.MustCompile(`[^\W\d][\w'-]*`)
+var wordsRe = regexp.MustCompile(`\b[^\W\d][\w'-]*\b`)
 
 type Fingerprint uint64
 type Vector [64]int
