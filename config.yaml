@@ -8,8 +8,6 @@ MemTable:
         minSize: 16
     SkipList:
         maxHeight: 32
-BTree:
-    minSize: 3
 SSTable:
     savePath: .
     summeryDegree: 5
