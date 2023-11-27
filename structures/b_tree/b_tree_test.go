@@ -28,7 +28,7 @@ func TestSize(t *testing.T) {
 	})
 	_ = bt.Add(&util.DataRecord{
 		Tombstone: false,
-		Key:       []byte("3"),
+		Key:       []byte("22"),
 		Value:     nil,
 		Timestamp: 0,
 	})
@@ -38,9 +38,33 @@ func TestSize(t *testing.T) {
 		Value:     nil,
 		Timestamp: 0,
 	})
+	_ = bt.Add(&util.DataRecord{
+		Tombstone: false,
+		Key:       []byte("6"),
+		Value:     nil,
+		Timestamp: 0,
+	})
+	_ = bt.Add(&util.DataRecord{
+		Tombstone: false,
+		Key:       []byte("9"),
+		Value:     nil,
+		Timestamp: 0,
+	})
+	_ = bt.Add(&util.DataRecord{
+		Tombstone: false,
+		Key:       []byte("69"),
+		Value:     nil,
+		Timestamp: 0,
+	})
+	_ = bt.Add(&util.DataRecord{
+		Tombstone: false,
+		Key:       []byte("23"),
+		Value:     nil,
+		Timestamp: 0,
+	})
 
-	if bt.size != 3 {
-		t.Errorf("Expected size to be 3, got %d", bt.size)
+	if bt.size != 7 {
+		t.Errorf("Expected size to be 7, got %d", bt.size)
 	}
 }
 

@@ -1,4 +1,4 @@
-package mem_table
+package memtable
 
 import (
 	"log"
@@ -8,7 +8,7 @@ import (
 	"nasp-project/util"
 )
 
-type MemTableStructure interface {
+type memtableStructure interface {
 	// Add record to structure. Returns error if structure is full.
 	Add(record *util.DataRecord) error
 	// Delete record from structure. Returns error if key does not exist.
@@ -19,45 +19,49 @@ type MemTableStructure interface {
 	Flush() []*util.DataRecord
 }
 
-type MemTable struct {
-	structure MemTableStructure
+type Memtable struct {
+	structure memtableStructure
 }
 
-// NewMemTable creates an instance of MemTable. Creates Skip List if structure is not defined.
-func NewMemTable() *MemTable {
+// NewMemTable creates an instance of Memtable. Creates Skip List if structure is not defined.
+func NewMemTable() *Memtable {
 	config := util.GetConfig()
 	structure := config.MemTable.Structure
 
 	switch structure {
 	case "BTree":
-		return &MemTable{
+		return &Memtable{
 			structure: b_tree.NewBTree(config.MemTable.BTree.MinSize),
 		}
 	case "SkipList":
-		return &MemTable{
+		return &Memtable{
 			structure: skip_list.NewSkipList(uint32(config.MemTable.MaxSize), uint32(config.MemTable.SkipList.MaxHeight)),
 		}
 	case "HashMap":
-		return &MemTable{
+		return &Memtable{
 			structure: hash_map.NewHashMap(uint32(config.MemTable.MaxSize)),
 		}
 	default:
 		log.Print("warning: The memory table structure is invalid. The default structure (SkipList) will be used.")
 		structure = "SkipList"
-		return &MemTable{
+		return &Memtable{
 			structure: skip_list.NewSkipList(uint32(config.MemTable.MaxSize), uint32(config.MemTable.SkipList.MaxHeight)),
 		}
 	}
 }
 
-func (mt *MemTable) Add(record *util.DataRecord) error {
+func (mt *Memtable) Add(record *util.DataRecord) error {
 	return mt.structure.Add(record)
 }
 
-func (mt *MemTable) Delete(key []byte) error {
+func (mt *Memtable) Delete(key []byte) error {
 	return mt.structure.Delete(key)
 }
 
-func (mt *MemTable) Flush() []*util.DataRecord {
+func (mt *Memtable) Flush() []*util.DataRecord {
 	return mt.structure.Flush()
+}
+
+func (mt *Memtable) Get(key []byte) (*util.DataRecord, error) {
+	return mt.structure.Get(key)
 }

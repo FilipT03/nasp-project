@@ -35,8 +35,8 @@ func NewBTree(minRecords int) *BTree {
 
 // Get searches for a key in the B-tree and returns an error if the key is not found.
 func (bt *BTree) Get(key []byte) (*util.DataRecord, error) {
-	index, node, _ := bt.findKey(string(key), true)
-	if index == -1 {
+	index, node, _, found := bt.findKey(string(key), true)
+	if !found {
 		return nil, errors.New("error: key '" + string(key) + "' not found in B-tree")
 	}
 	return node.records[index], nil
@@ -44,7 +44,7 @@ func (bt *BTree) Get(key []byte) (*util.DataRecord, error) {
 
 // Add a new record to the B-tree while handling overflows.
 func (bt *BTree) Add(record *util.DataRecord) error {
-	index, nodeToInsert, ancestors := bt.findKey(string(record.Key), false)
+	index, nodeToInsert, ancestors, found := bt.findKey(string(record.Key), false)
 	_, err := nodeToInsert.addRecord(record, index)
 	if err != nil {
 		return err
@@ -66,6 +66,9 @@ func (bt *BTree) Add(record *util.DataRecord) error {
 		bt.root = newRoot
 	}
 
+	if !found {
+		bt.size++
+	}
 	return nil
 }
 
@@ -73,8 +76,8 @@ func (bt *BTree) Add(record *util.DataRecord) error {
 // Returns an error if the key is not found or is already marked as deleted.
 // Use Remove to delete key from the B tree.
 func (bt *BTree) Delete(key []byte) error {
-	index, nodeToInsert, _ := bt.findKey(string(key), false)
-	if index == -1 {
+	index, nodeToInsert, _, found := bt.findKey(string(key), false)
+	if !found {
 		return errors.New("error: could not delete key '" + string(key) + "' as it does not exist B-tree")
 	}
 	if nodeToInsert.records[index].Tombstone {
@@ -87,8 +90,8 @@ func (bt *BTree) Delete(key []byte) error {
 // Remove deletes a key from the BTree. Returns an error if the key is not found.
 // For logical deletion, use Delete.
 func (bt *BTree) Remove(key []byte) error {
-	index, nodeToDeleteFrom, ancestorsIndexes := bt.findKey(string(key), true)
-	if index == -1 {
+	index, nodeToDeleteFrom, ancestorsIndexes, found := bt.findKey(string(key), true)
+	if !found {
 		return errors.New("error: could not delete key '" + string(key) + "' as it does not exist B-tree")
 	}
 	if nodeToDeleteFrom.isLeaf() {
@@ -126,19 +129,16 @@ func (bt *BTree) Remove(key []byte) error {
 	return nil
 }
 
-func getSortedNodes(node *Node, records *[]*util.DataRecord) {
-	if !node.isLeaf() {
-		for _, child := range node.children {
-			getSortedNodes(child, records)
-		}
-	}
-	for _, record := range node.records {
-		fmt.Println(string(record.Key))
+func getSortedNodes(node *Node) {
+	for _, child := range node.children {
+		getSortedNodes(child)
+		fmt.Println(child)
 	}
 }
 
 // Flush  returns sorted record in B tree
 func (bt *BTree) Flush() []*util.DataRecord {
+	getSortedNodes(bt.root)
 	return nil
 }
 
@@ -150,20 +150,20 @@ func NewNode(owner *BTree, items []*util.DataRecord, children []*Node) *Node {
 	}
 }
 
-// findKey returns index, node and ancestors of found key. If `exact` is true, it returns index -1 if key is not found.
-func (bt *BTree) findKey(key string, exact bool) (int, *Node, []int) {
+// findKey returns index, node and ancestors of found key. Returns false if key is not found in B-tree.
+func (bt *BTree) findKey(key string, exact bool) (int, *Node, []int, bool) {
 	current := bt.root
 	ancestors := []int{0}
 	for {
 		found, index := current.findKey(key)
 		if found {
-			return index, current, ancestors
+			return index, current, ancestors, true
 		}
 		if current.isLeaf() {
 			if exact {
-				return -1, nil, nil
+				return index, current, ancestors, false
 			}
-			return index, current, ancestors
+			return index, current, ancestors, false
 		}
 		nextChild := current.children[index]
 		ancestors = append(ancestors, index)
@@ -295,24 +295,17 @@ func merge(parentNode *Node, unbalancedNodeIndex int) {
 }
 
 func (n *Node) addRecord(record *util.DataRecord, index int) (int, error) {
-	if index < len(n.records) && n.records[index] != nil {
-		n.records[index] = record
-		return index, nil
-	}
-
 	if n.owner.size == n.owner.capacity {
 		return -1, errors.New("error: failed to add item with key " + string(record.Key) + ", skip list is full")
 	}
 
 	if len(n.records) == index {
 		n.records = append(n.records, record)
-		n.owner.size++
 		return index, nil
 	}
 
 	n.records = append(n.records[:index+1], n.records[index:]...)
 	n.records[index] = record
-	n.owner.size++
 
 	return index, nil
 }
