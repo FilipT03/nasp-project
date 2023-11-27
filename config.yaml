@@ -9,11 +9,13 @@ MemTable:
     SkipList:
         maxHeight: 32
 SSTable:
-    savePath: .
-    summeryDegree: 5
+    savePath: ./data
+    singleFile: false
+    summaryDegree: 5
     indexDegree: 5
-    compression: true
-LMS:
+    compression: false
+    filterPrecision: 0.01
+LSMTree:
     maxLevel: 4
 Cache:
     maxSize: 1024

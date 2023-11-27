@@ -12,7 +12,7 @@ type Config struct {
 	WAL      WALConfig      `yaml:"WAL"`
 	MemTable MemTableConfig `yaml:"MemTable"`
 	SSTable  SSTableConfig  `yaml:"SSTable"`
-	LMS      LMSConfig      `yaml:"LMS"`
+	LSMTree  LSMTreeConfig  `yaml:"LMS"`
 	Cache    CacheConfig    `yaml:"Cache"`
 }
 
@@ -37,13 +37,15 @@ type SkipListConfig struct {
 }
 
 type SSTableConfig struct {
-	SavePath      string `yaml:"savePath"`
-	SummeryDegree int    `yaml:"summeryDegree"`
-	IndexDegree   int    `yaml:"indexDegree"`
-	Compression   bool   `yaml:"compression"`
+	SavePath        string  `yaml:"savePath"`
+	SingleFile      bool    `yaml:"singleFile"`
+	SummaryDegree   int     `yaml:"summaryDegree"`
+	IndexDegree     int     `yaml:"indexDegree"`
+	Compression     bool    `yaml:"compression"`
+	FilterPrecision float64 `yaml:"filterPrecision"`
 }
 
-type LMSConfig struct {
+type LSMTreeConfig struct {
 	MaxLevel int `yaml:"maxLevel"`
 }
 
@@ -67,12 +69,14 @@ var config = &Config{
 		},
 	},
 	SSTable: SSTableConfig{
-		SavePath:      ".",
-		SummeryDegree: 5,
-		IndexDegree:   5,
-		Compression:   true,
+		SavePath:        "./data",
+		SingleFile:      false,
+		SummaryDegree:   5,
+		IndexDegree:     5,
+		Compression:     true,
+		FilterPrecision: 0.01,
 	},
-	LMS: LMSConfig{
+	LSMTree: LSMTreeConfig{
 		MaxLevel: 4,
 	},
 	Cache: CacheConfig{
