@@ -25,9 +25,7 @@ type IndexRecord struct {
 }
 
 type IndexBlock struct {
-	Filename    string
-	StartOffset int64
-	Size        int64
+	Block // Only block because nothing is ever loaded into memory
 }
 
 // CreateFromDataBlock creates an index block from the given data block and writes it to disk.

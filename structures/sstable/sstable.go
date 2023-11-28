@@ -34,17 +34,25 @@ func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
 		// Starting offset for each block is calculated after the previous block is written.
 		sstable = &SSTable{
 			Data: DataBlock{
-				Filename:    filepath.Join(path, "usertable-"+label+"-SSTable.db"),
-				StartOffset: 0,
+				Block{
+					Filename:    filepath.Join(path, "usertable-"+label+"-SSTable.db"),
+					StartOffset: 0,
+				},
 			},
 			Index: IndexBlock{
-				Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
+				Block{
+					Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
+				},
 			},
 			Summary: SummaryBlock{
-				Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
+				Block: Block{
+					Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
+				},
 			},
 			Filter: FilterBlock{
-				Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
+				Block: Block{
+					Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
+				},
 			},
 			TOCFilename:      filepath.Join(path, "TOC", "usertable-"+label+"-TOC.txt"),
 			MetadataFilename: filepath.Join(path, "usertable-"+label+"-Metadata.txt"),
@@ -52,20 +60,28 @@ func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
 	} else {
 		sstable = &SSTable{
 			Data: DataBlock{
-				Filename:    filepath.Join(path, "usertable-"+label+"-Data.db"),
-				StartOffset: 0,
+				Block{
+					Filename:    filepath.Join(path, "usertable-"+label+"-Data.db"),
+					StartOffset: 0,
+				},
 			},
 			Index: IndexBlock{
-				Filename:    filepath.Join(path, "usertable-"+label+"-Index.db"),
-				StartOffset: 0,
+				Block{
+					Filename:    filepath.Join(path, "usertable-"+label+"-Index.db"),
+					StartOffset: 0,
+				},
 			},
 			Summary: SummaryBlock{
-				Filename:    filepath.Join(path, "usertable-"+label+"-Summary.db"),
-				StartOffset: 0,
+				Block: Block{
+					Filename:    filepath.Join(path, "usertable-"+label+"-Summary.db"),
+					StartOffset: 0,
+				},
 			},
 			Filter: FilterBlock{
-				Filename:    filepath.Join(path, "usertable-"+label+"-Filter.db"),
-				StartOffset: 0,
+				Block: Block{
+					Filename:    filepath.Join(path, "usertable-"+label+"-Filter.db"),
+					StartOffset: 0,
+				},
 			},
 			TOCFilename:      filepath.Join(path, "TOC", "usertable-"+label+"-TOC.txt"),
 			MetadataFilename: filepath.Join(path, "usertable-"+label+"-Metadata.txt"),
@@ -325,27 +341,35 @@ func OpenSSTableFromToc(tocPath string) (*SSTable, error) {
 		switch i {
 		case 0:
 			sstable.Data = DataBlock{
-				Filename:    filename,
-				StartOffset: startOffset,
-				Size:        size,
+				Block{
+					Filename:    filename,
+					StartOffset: startOffset,
+					Size:        size,
+				},
 			}
 		case 1:
 			sstable.Index = IndexBlock{
-				Filename:    filename,
-				StartOffset: startOffset,
-				Size:        size,
+				Block{
+					Filename:    filename,
+					StartOffset: startOffset,
+					Size:        size,
+				},
 			}
 		case 2:
 			sstable.Summary = SummaryBlock{
-				Filename:    filename,
-				StartOffset: startOffset,
-				Size:        size,
+				Block: Block{
+					Filename:    filename,
+					StartOffset: startOffset,
+					Size:        size,
+				},
 			}
 		case 3:
 			sstable.Filter = FilterBlock{
-				Filename:    filename,
-				StartOffset: startOffset,
-				Size:        size,
+				Block: Block{
+					Filename:    filename,
+					StartOffset: startOffset,
+					Size:        size,
+				},
 			}
 		}
 	}
