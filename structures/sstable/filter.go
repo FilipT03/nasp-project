@@ -8,10 +8,8 @@ import (
 
 // FilterBlock represents a filter block in an SSTable
 type FilterBlock struct {
-	Filename    string                    // Where the filter block is stored
-	StartOffset int64                     // Where the filter block starts in the file (in bytes)
-	Size        int64                     // Size of the filter block (in bytes)
-	Filter      *bloom_filter.BloomFilter // Lazy loaded filter
+	Block
+	Filter *bloom_filter.BloomFilter // Lazy loaded filter
 }
 
 // HasLoaded returns true if the filter has been loaded into memory.

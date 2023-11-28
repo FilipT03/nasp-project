@@ -27,12 +27,10 @@ type SummaryRecord struct {
 }
 
 type SummaryBlock struct {
-	Filename    string
-	StartOffset int64
-	Size        int64
-	StartKey    []byte
-	EndKey      []byte
-	Records     []SummaryRecord
+	Block
+	StartKey []byte
+	EndKey   []byte
+	Records  []SummaryRecord
 }
 
 // HasLoaded returns true if the summary block has been loaded into memory.

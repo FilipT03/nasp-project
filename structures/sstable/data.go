@@ -36,9 +36,7 @@ type DataRecord struct {
 
 // DataBlock represents a data block in an SSTable.
 type DataBlock struct {
-	Filename    string // Where the data block is stored
-	StartOffset int64  // Where the data block starts in the file (in bytes)
-	Size        int64  // Size of the data block (in bytes)
+	Block // Only block because nothing is ever loaded into memory
 }
 
 func dataRecordsFromRecords(recs []model.Record) []DataRecord {
