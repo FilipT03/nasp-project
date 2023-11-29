@@ -2,6 +2,7 @@ package hash_map
 
 import (
 	"errors"
+	"fmt"
 	"nasp-project/model"
 	"sort"
 )
@@ -34,7 +35,7 @@ func (hm *HashMap) Delete(key []byte) error {
 
 func (hm *HashMap) Get(key []byte) (*model.Record, error) {
 	if _, ok := hm.data[string(key)]; ok {
-		return nil, nil
+		return hm.data[string(key)], nil
 	} else {
 		return nil, errors.New("error: key '" + string(key) + "' not found in Hash Map")
 	}
@@ -53,5 +54,6 @@ func (hm *HashMap) Flush() []*model.Record {
 	}
 
 	hm.data = make(map[string]*model.Record)
+	fmt.Println(records)
 	return records
 }
