@@ -39,11 +39,7 @@ func (bt *BTree) Get(key []byte) (*model.Record, error) {
 	if !found {
 		return nil, errors.New("error: key '" + string(key) + "' not found in B-tree")
 	}
-	if node.records[index].Tombstone {
-		return node.records[index], nil
-	} else {
-		return nil, errors.New("error: key '" + string(key) + "' not found in B-tree (is deleted)")
-	}
+	return node.records[index], nil
 }
 
 // Add a new record to the B-tree while handling overflows.
