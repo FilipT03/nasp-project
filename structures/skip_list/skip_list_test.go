@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestAddAndDelete(t *testing.T) {
+func TestAddAndRemove(t *testing.T) {
 	sl := NewSkipList(100, 20)
 	keys := []string{"key1", "key2", "key3", "key4", "key5"}
 	for _, key := range keys {
@@ -27,19 +27,19 @@ func TestAddAndDelete(t *testing.T) {
 		t.Error("key5 not found in the skip list")
 	}
 
-	err := sl.Delete([]byte("key2"))
+	err := sl.Remove([]byte("key2"))
 	if err != nil {
 		t.Error(err)
 	}
 	if sl.HasKey("key2") {
-		t.Error("key2 not deleted")
+		t.Error("key2 not Removed")
 	}
-	err = sl.Delete([]byte("key4"))
+	err = sl.Remove([]byte("key4"))
 	if err != nil {
 		t.Error(err)
 	}
 	if sl.HasKey("key4") {
-		t.Error("key4 not deleted")
+		t.Error("key4 not Removed")
 	}
 }
 
@@ -67,7 +67,7 @@ func TestMaxSize(t *testing.T) {
 		t.Error("Didn't return error for full skip list")
 	}
 
-	err = sl.Delete([]byte("key4"))
+	err = sl.Remove([]byte("key4"))
 	if err != nil {
 		t.Error(err)
 	}

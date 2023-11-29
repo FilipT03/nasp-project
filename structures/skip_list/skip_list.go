@@ -185,8 +185,21 @@ func (sl *SkipList) Print() {
 	}
 }
 
-// Delete attempts to delete the item with the specified key from the skip list. Returns error if it's not present.
+// Delete marks a record as deleted by setting its tombstone to true.
+// Returns an error if the key is not found or is already marked as deleted.
+// Use Remove to delete key from the B tree.
 func (sl *SkipList) Delete(key []byte) error {
+	node, err := sl.Get(key)
+	if err != nil {
+		return err
+	}
+	node.Tombstone = true
+	return nil
+}
+
+// Remove deletes a key from the SkipList. Returns an error if the key is not found.
+// For logical deletion, use Delete.
+func (sl *SkipList) Remove(key []byte) error {
 	resultNode := sl.searchForKey(string(key))
 	if resultNode.record == nil || string(resultNode.record.Key) != string(key) {
 		return errors.New("error: failed to delete key" + string(key) + ", it's not in the skip list")
