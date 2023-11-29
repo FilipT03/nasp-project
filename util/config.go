@@ -10,7 +10,7 @@ import (
 
 type Config struct {
 	WAL      WALConfig      `yaml:"WAL"`
-	MemTable MemTableConfig `yaml:"MemTable"`
+	MemTable MemtableConfig `yaml:"Memtable"`
 	SSTable  SSTableConfig  `yaml:"SSTable"`
 	LSMTree  LSMTreeConfig  `yaml:"LMS"`
 	Cache    CacheConfig    `yaml:"Cache"`
@@ -20,7 +20,7 @@ type WALConfig struct {
 	SegmentSize int `yaml:"segmentSize"`
 }
 
-type MemTableConfig struct {
+type MemtableConfig struct {
 	MaxSize   int            `yaml:"maxSize"`
 	Structure string         `yaml:"structure"`
 	Instances int            `yaml:"instances"`
@@ -57,7 +57,7 @@ var config = &Config{
 	WAL: WALConfig{
 		SegmentSize: 512,
 	},
-	MemTable: MemTableConfig{
+	MemTable: MemtableConfig{
 		MaxSize:   1024,
 		Structure: "SkipList",
 		Instances: 1,

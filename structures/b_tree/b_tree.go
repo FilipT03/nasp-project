@@ -39,13 +39,20 @@ func (bt *BTree) Get(key []byte) (*model.Record, error) {
 	if !found {
 		return nil, errors.New("error: key '" + string(key) + "' not found in B-tree")
 	}
-	return node.records[index], nil
+	if node.records[index].Tombstone {
+		return node.records[index], nil
+	} else {
+		return nil, errors.New("error: key '" + string(key) + "' not found in B-tree (is deleted)")
+	}
 }
 
 // Add a new record to the B-tree while handling overflows.
 func (bt *BTree) Add(record *model.Record) error {
 	index, nodeToInsert, ancestors, found := bt.findKey(string(record.Key), false)
 	_, err := nodeToInsert.addRecord(record, index)
+	if found && bt.size >= bt.capacity {
+		return errors.New("error: failed to add item with key " + string(record.Key) + ", b tree is full")
+	}
 	if err != nil {
 		return err
 	}
@@ -65,7 +72,6 @@ func (bt *BTree) Add(record *model.Record) error {
 		newRoot.split(bt.root, 0)
 		bt.root = newRoot
 	}
-
 	if !found {
 		bt.size++
 	}
@@ -124,7 +130,6 @@ func (bt *BTree) Remove(key []byte) error {
 	if len(bt.root.records) == 0 && len(bt.root.children) > 0 {
 		bt.root = bt.root.children[len(bt.root.children)-1]
 	}
-
 	bt.size--
 	return nil
 }
@@ -266,7 +271,6 @@ func rotateLeft(unbalancedNode *Node, parentNode *Node, rightNode *Node, unbalan
 		rightNode.children = unbalancedNode.children[1:]
 		unbalancedNode.children = append(unbalancedNode.children, childToShift)
 	}
-
 }
 
 func merge(parentNode *Node, unbalancedNodeIndex int) {

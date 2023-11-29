@@ -1,6 +1,6 @@
 WAL:
     segmentSize: 512
-MemTable:
+Memtable:
     maxSize: 1024
     structure: SkipList
     instances: 1
