@@ -12,19 +12,19 @@ import (
 )
 
 /*
-   +---------------+-----------------+---------------+---------------+-----------------+-...-+--...--+
-   |    CRC (4B)   | Timestamp (8B) | Tombstone(1B) | Key Size (8B) | Value Size (8B) | Key | Value |
-   +---------------+-----------------+---------------+---------------+-----------------+-...-+--...--+
-   CRC = 32bit hash computed over the payload using CRC
-   Timestamp = Timestamp of the operation in seconds
-   Tombstone = If this record was deleted and has a value
-   Key Size = Length of the Key data
-   Value Size = Length of the Value data
-   Key = Key data
-   Value = Value data
+  +---------------+-----------------+---------------+---------------+-----------------+-...-+--...--+
+  |    CRC (4B)   | Timestamp (8B) | Tombstone(1B) | Key Size (8B) | Value Size (8B) | Key | Value |
+  +---------------+-----------------+---------------+---------------+-----------------+-...-+--...--+
+  CRC = 32bit hash computed over the payload using CRC
+  Timestamp = Timestamp of the operation in seconds
+  Tombstone = If this record was deleted and has a value
+  Key Size = Length of the Key data
+  Value Size = Length of the Value data
+  Key = Key data
+  Value = Value data
 
-   Each file starts with a header of 8 bytes storing start of the first whole record in that segment
-   in bytes, from the beginning of the file.
+  Each file starts with a header of 8 bytes storing start of the first whole record in that segment
+  in bytes, from the beginning of the file.
 */
 
 const (
@@ -57,17 +57,50 @@ type Record struct {
 }
 
 type WAL struct {
-	buffer      []*Record
-	bufferSize  uint32
-	segmentSize uint64
+	buffer         []*Record
+	bufferSize     uint32
+	segmentSize    uint64
+	latestFileName string
 }
 
-func NewWAL(bufferSize uint32, segmentSize uint64) *WAL {
-	return &WAL{
-		buffer:      make([]*Record, 0),
-		bufferSize:  bufferSize,
-		segmentSize: segmentSize,
+func NewWAL(bufferSize uint32, segmentSize uint64) (*WAL, error) {
+	dirEntries, err := os.ReadDir(WALPath)
+	if os.IsNotExist(err) {
+		err := os.Mkdir(WALPath, os.ModeDir)
+		if err != nil {
+			return nil, err
+		}
+	} else if err != nil {
+		return nil, err
 	}
+	var latestFileName = ""
+	if len(dirEntries) == 0 {
+		f, err := os.OpenFile(WALPath+"wal_0001.log", os.O_RDWR|os.O_CREATE, 0644)
+		if err != nil {
+			return nil, err
+		}
+		err = f.Truncate(8)
+		if err != nil {
+			return nil, err
+		}
+		_, err = f.Write(binary.LittleEndian.AppendUint64(make([]byte, 0), 8))
+		if err != nil {
+			return nil, err
+		}
+		err = f.Close()
+		if err != nil {
+			return nil, err
+		}
+		latestFileName = "wal_0001.log"
+	} else {
+		latestFileName = dirEntries[len(dirEntries)-1].Name()
+	}
+	return &WAL{
+		buffer:         make([]*Record, 0),
+		bufferSize:     bufferSize,
+		segmentSize:    segmentSize,
+		latestFileName: latestFileName,
+	}, nil
 }
 
 func (wal *WAL) PutCommit(key string, value []byte) {
