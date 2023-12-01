@@ -79,11 +79,11 @@ func NewWAL(bufferSize uint32, segmentSize uint64) (*WAL, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = f.Truncate(8)
+		err = f.Truncate(HeaderSize)
 		if err != nil {
 			return nil, err
 		}
-		_, err = f.Write(binary.LittleEndian.AppendUint64(make([]byte, 0), 8))
+		_, err = f.Write(binary.LittleEndian.AppendUint64(make([]byte, 0), HeaderSize))
 		if err != nil {
 			return nil, err
 		}
@@ -130,22 +130,16 @@ func (wal *WAL) writeBuffer() error {
 		newData = append(newData, wal.recordToByteArray(element)...)
 	}
 
-	f, err := os.OpenFile("wal"+string(os.PathSeparator)+"wal_test.log", os.O_RDWR|os.O_CREATE, 0644)
+	f, err := os.OpenFile(WALPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err := os.Remove("file.txt")
-		if err != nil {
-			returnError = err
-		}
-	}() // os.Remove("file.txt")
 	defer f.Close()
 
 	fi, _ := f.Stat()
 	oldSize := fi.Size()
 	if oldSize == 0 {
-		err = f.Truncate(8 + int64(len(newData)))
+		err = f.Truncate(HeaderSize + int64(len(newData)))
 	} else {
 		err = f.Truncate(fi.Size() + int64(len(newData)))
 	}
@@ -165,8 +159,8 @@ func (wal *WAL) writeBuffer() error {
 	}
 
 	if oldSize == 0 {
-		binary.LittleEndian.PutUint64(mmapFile[0:8], 8)
-		copy(mmapFile[8:], newData)
+		binary.LittleEndian.PutUint64(mmapFile[0:HeaderSize], HeaderSize)
+		copy(mmapFile[HeaderSize:], newData)
 	} else {
 		copy(mmapFile[oldSize:], newData)
 	}
@@ -196,19 +190,19 @@ func (wal *WAL) GetAllRecords() ([]*Record, error) {
 			continue
 		}
 
-		mmapFile, err := mmap.Map(f, mmap.RDWR, 0) // ERROR PRI MAPIRANJU
+		mmapFile, err := mmap.Map(f, mmap.RDWR, 0)
 		if err != nil {
 			return nil, err
 		}
 
 		header := binary.LittleEndian.Uint64(mmapFile[0:HeaderSize])
 		if remainderSlice != nil { // we need to combine the end of the last file and start of this one
-			record, err := wal.readRecordFromSlice(0, append(remainderSlice, mmapFile...))
+			record, err := wal.readRecordFromSlice(0, append(remainderSlice, mmapFile[HeaderSize:header]...))
 			if err != nil {
 				return nil, err
 			}
 			if record == nil { // the record is in more than two files
-				remainderSlice = append(remainderSlice, mmapFile...)
+				remainderSlice = append(remainderSlice, mmapFile[HeaderSize:]...)
 				break
 			} else {
 				result = append(result, record)
