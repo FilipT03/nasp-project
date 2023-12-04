@@ -132,8 +132,8 @@ func (sl *SkipList) Add(record *model.Record) error {
 	return nil
 }
 
-func (sl *SkipList) Flush() []*model.Record {
-	var records []*model.Record
+func (sl *SkipList) Flush() []model.Record {
+	var records []model.Record
 	starterNode := sl.head
 	height := sl.height
 
@@ -143,7 +143,7 @@ func (sl *SkipList) Flush() []*model.Record {
 	}
 
 	for starterNode.next != nil {
-		records = append(records, starterNode.next.record)
+		records = append(records, *starterNode.next.record)
 		starterNode = starterNode.next
 	}
 

@@ -41,16 +41,16 @@ func (hm *HashMap) Get(key []byte) (*model.Record, error) {
 	}
 }
 
-func (hm *HashMap) Flush() []*model.Record {
+func (hm *HashMap) Flush() []model.Record {
 	keys := make([]string, 0, hm.capacity)
 	for k, _ := range hm.data {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	records := make([]*model.Record, hm.capacity)
+	records := make([]model.Record, hm.capacity)
 
 	for _, k := range keys {
-		records = append(records, hm.data[k])
+		records = append(records, *hm.data[k])
 	}
 
 	hm.data = make(map[string]*model.Record)

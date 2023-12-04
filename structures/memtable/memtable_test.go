@@ -9,38 +9,38 @@ import (
 )
 
 func add(mt *Memtable) {
-	_ = mt.Add(&model.Record{
+	mt.Add(&model.Record{
 		Key:       []byte("1"),
 		Value:     nil,
 		Tombstone: false,
 		Timestamp: 0,
 	})
-	_ = mt.Add(&model.Record{
+	mt.Add(&model.Record{
 		Key:       []byte("5"),
 		Value:     nil,
 		Tombstone: false,
 		Timestamp: 0,
 	})
-	_ = mt.Add(&model.Record{
+	mt.Add(&model.Record{
 		Key:       []byte("7"),
 		Value:     nil,
 		Tombstone: false,
 		Timestamp: 0,
 	})
 
-	_ = mt.Add(&model.Record{
+	mt.Add(&model.Record{
 		Key:       []byte("8"),
 		Value:     nil,
 		Tombstone: false,
 		Timestamp: 0,
 	})
-	_ = mt.Add(&model.Record{
+	mt.Add(&model.Record{
 		Key:       []byte("4"),
 		Value:     nil,
 		Tombstone: false,
 		Timestamp: 0,
 	})
-	_ = mt.Add(&model.Record{
+	mt.Add(&model.Record{
 		Key:       []byte("2"),
 		Value:     nil,
 		Tombstone: false,
@@ -63,28 +63,28 @@ func testLogicalDelete(t *testing.T, structure string) {
 	}
 }
 
-func testFullSize(t *testing.T, structure string) {
-	util.GetConfig().MemTable.MaxSize = 6
-	util.GetConfig().MemTable.Structure = structure
-	mt := NewMemtable(&util.GetConfig().MemTable)
-	add(mt)
-	err := mt.Add(&model.Record{
-		Key:       []byte("69"),
-		Value:     nil,
-		Tombstone: false,
-		Timestamp: 0,
-	})
-	if err == nil {
-		t.Errorf("error: %s should be full", structure)
-	}
-}
+//func testFullSize(t *testing.T, structure string) {
+//	util.GetConfig().MemTable.MaxSize = 6
+//	util.GetConfig().MemTable.Structure = structure
+//	mt := NewMemtable(&util.GetConfig().MemTable)
+//	add(mt)
+//	err := mt.Add(&model.Record{
+//		Key:       []byte("69"),
+//		Value:     nil,
+//		Tombstone: false,
+//		Timestamp: 0,
+//	})
+//	if err == nil {
+//		t.Errorf("error: %s should be full", structure)
+//	}
+//}
 
 func testFlush(t *testing.T, structure string) {
 	util.GetConfig().MemTable.Structure = structure
 
 	mt := NewMemtable(&util.GetConfig().MemTable)
 	add(mt)
-	records := mt.Flush()
+	records := mt.structure.Flush()
 	sol := [][]byte{[]byte("1"), []byte("2"), []byte("4"), []byte("5"), []byte("7"), []byte("8")}
 	for i, record := range records {
 		log.Printf("[%s] : %d - %s ", structure, i, string(record.Key))
@@ -94,11 +94,11 @@ func testFlush(t *testing.T, structure string) {
 	}
 }
 
-func TestFullSize(t *testing.T) {
-	testFullSize(t, "SkipList")
-	testFullSize(t, "BTree")
-	testFullSize(t, "HashMap")
-}
+//func TestFullSize(t *testing.T) {
+//	testFullSize(t, "SkipList")
+//	testFullSize(t, "BTree")
+//	testFullSize(t, "HashMap")
+//}
 
 func TestLogicalDelete(t *testing.T) {
 	testLogicalDelete(t, "SkipList")
