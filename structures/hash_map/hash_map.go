@@ -42,7 +42,7 @@ func (hm *HashMap) Get(key []byte) (*model.Record, error) {
 }
 
 func (hm *HashMap) Flush() []model.Record {
-	keys := make([]string, 0, hm.capacity)
+	keys := make([]string, 0)
 	for k, _ := range hm.data {
 		keys = append(keys, k)
 	}
@@ -56,4 +56,8 @@ func (hm *HashMap) Flush() []model.Record {
 	hm.data = make(map[string]*model.Record)
 	fmt.Println(records)
 	return records
+}
+
+func (hm *HashMap) Clear() {
+	hm.data = make(map[string]*model.Record)
 }

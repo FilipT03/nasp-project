@@ -1,6 +1,7 @@
 package skip_list
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -109,7 +110,7 @@ func (sl *SkipList) Add(record *model.Record) error {
 	currentNode := sl.head
 	var lastAddedNode *skipListNode = nil // keeping track of the last added node se we can redirect its down pointer.
 	for {
-		if currentNode.next == nil || string(record.Key) < string(currentNode.next.record.Key) {
+		if currentNode.next == nil || bytes.Compare(record.Key, currentNode.next.record.Key) == -1 {
 			if currentHeight <= newHeight { // we are adding a new node
 				currentNode.next = &skipListNode{currentNode.next, nil, newRecord}
 				if lastAddedNode != nil {
@@ -197,11 +198,17 @@ func (sl *SkipList) Delete(key []byte) error {
 	return nil
 }
 
+func (sl *SkipList) Clear() {
+	sl.head = &skipListNode{}
+	sl.height = 0
+	sl.size = 0
+}
+
 // Remove deletes a key from the SkipList. Returns an error if the key is not found.
 // For logical deletion, use Delete.
 func (sl *SkipList) Remove(key []byte) error {
 	resultNode := sl.searchForKey(string(key))
-	if resultNode.record == nil || string(resultNode.record.Key) != string(key) {
+	if resultNode.record == nil || bytes.Compare(resultNode.record.Key, key) != 0 {
 		return errors.New("error: failed to delete key" + string(key) + ", it's not in the skip list")
 	} else {
 		currentNode := sl.head

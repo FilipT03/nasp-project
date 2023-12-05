@@ -1,6 +1,7 @@
 package b_tree
 
 import (
+	"bytes"
 	"errors"
 	"nasp-project/model"
 	"nasp-project/util"
@@ -28,14 +29,14 @@ func NewBTree(minRecords int) *BTree {
 	owner.root.owner = owner
 	owner.minRecords = minRecords
 	owner.maxRecords = 2 * minRecords
-	owner.capacity = uint32(util.GetConfig().MemTable.MaxSize)
+	owner.capacity = uint32(util.GetConfig().Memtable.MaxSize)
 	owner.size = 0
 	return owner
 }
 
 // Get searches for a key in the B-tree and returns an error if the key is not found.
 func (bt *BTree) Get(key []byte) (*model.Record, error) {
-	index, node, _, found := bt.findKey(string(key), true)
+	index, node, _, found := bt.findKey(key, true)
 	if !found {
 		return nil, errors.New("error: key '" + string(key) + "' not found in B-tree")
 	}
@@ -44,7 +45,7 @@ func (bt *BTree) Get(key []byte) (*model.Record, error) {
 
 // Add a new record to the B-tree while handling overflows.
 func (bt *BTree) Add(record *model.Record) error {
-	index, nodeToInsert, ancestors, found := bt.findKey(string(record.Key), false)
+	index, nodeToInsert, ancestors, found := bt.findKey(record.Key, false)
 	_, err := nodeToInsert.addRecord(record, index)
 	if found && bt.size >= bt.capacity {
 		return errors.New("error: failed to add item with key " + string(record.Key) + ", b tree is full")
@@ -78,7 +79,7 @@ func (bt *BTree) Add(record *model.Record) error {
 // Returns an error if the key is not found or is already marked as deleted.
 // Use Remove to delete key from the B tree.
 func (bt *BTree) Delete(key []byte) error {
-	index, nodeToInsert, _, found := bt.findKey(string(key), false)
+	index, nodeToInsert, _, found := bt.findKey(key, false)
 	if !found {
 		return errors.New("error: could not delete key '" + string(key) + "' as it does not exist B-tree")
 	}
@@ -89,10 +90,16 @@ func (bt *BTree) Delete(key []byte) error {
 	return nil
 }
 
+func (bt *BTree) Clear() {
+	bt.root = &Node{}
+	bt.root.owner = bt
+	bt.size = 0
+}
+
 // Remove deletes a key from the BTree. Returns an error if the key is not found.
 // For logical deletion, use Delete.
 func (bt *BTree) Remove(key []byte) error {
-	index, nodeToDeleteFrom, ancestorsIndexes, found := bt.findKey(string(key), true)
+	index, nodeToDeleteFrom, ancestorsIndexes, found := bt.findKey(key, true)
 	if !found {
 		return errors.New("error: could not delete key '" + string(key) + "' as it does not exist B-tree")
 	}
@@ -160,7 +167,7 @@ func NewNode(owner *BTree, items []*model.Record, children []*Node) *Node {
 }
 
 // findKey returns index, node and ancestors of found key. Returns false if key is not found in B-tree.
-func (bt *BTree) findKey(key string, exact bool) (int, *Node, []int, bool) {
+func (bt *BTree) findKey(key []byte, exact bool) (int, *Node, []int, bool) {
 	current := bt.root
 	ancestors := []int{0}
 	for {
@@ -181,12 +188,12 @@ func (bt *BTree) findKey(key string, exact bool) (int, *Node, []int, bool) {
 }
 
 // findKey attempts to locate a key in the Node and returns the index where the key should be inserted if not found.
-func (n *Node) findKey(key string) (bool, int) {
+func (n *Node) findKey(key []byte) (bool, int) {
 	for i, record := range n.records {
-		if key == string(record.Key) {
+		if bytes.Compare(key, record.Key) == 0 {
 			return true, i
 		}
-		if key < string(record.Key) {
+		if bytes.Compare(key, record.Key) == -1 {
 			return false, i
 		}
 	}
