@@ -1,11 +1,13 @@
 WAL:
     segmentSize: 512
-MemTable:
+Memtable:
     maxSize: 1024
     structure: SkipList
     instances: 1
-BTree:
-    minSize: 3
+    BTree:
+        minSize: 16
+    SkipList:
+        maxHeight: 32
 SSTable:
     savePath: ./data
     singleFile: false
