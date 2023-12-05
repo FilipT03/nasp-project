@@ -1,7 +1,9 @@
 package skip_list
 
 import (
+	"bytes"
 	"nasp-project/model"
+	"nasp-project/util"
 	"testing"
 )
 
@@ -90,5 +92,55 @@ func TestMaxSize(t *testing.T) {
 	})
 	if err != nil {
 		t.Error("Returned error instead of updating the value")
+	}
+}
+
+func TestFlush(t *testing.T) {
+	sl := NewSkipList(uint32(util.GetConfig().Memtable.MaxSize), uint32(util.GetConfig().Memtable.SkipList.MaxHeight))
+
+	_ = sl.Add(&model.Record{
+		Key:       []byte("1"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+	_ = sl.Add(&model.Record{
+		Key:       []byte("5"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+	_ = sl.Add(&model.Record{
+		Key:       []byte("7"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+
+	_ = sl.Add(&model.Record{
+		Key:       []byte("8"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+	_ = sl.Add(&model.Record{
+		Key:       []byte("4"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+	_ = sl.Add(&model.Record{
+		Key:       []byte("2"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+
+	records := sl.Flush()
+	sol := [][]byte{[]byte("1"), []byte("2"), []byte("4"), []byte("5"), []byte("7"), []byte("8")}
+	for i, record := range records {
+		if bytes.Compare(record.Key, sol[i]) != 0 {
+			t.Errorf("error: keys are not sorted correcly at %d", i)
+		}
 	}
 }
