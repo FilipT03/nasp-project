@@ -1,6 +1,7 @@
 package memtable
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"nasp-project/model"
@@ -83,32 +84,50 @@ func CreateMemtables(config *util.MemtableConfig) {
 func Add(record *model.Record) {
 	mt := Memtables.tables[Memtables.currentIndex]
 	err := mt.structure.Add(record)
-	if err == nil {
-		fmt.Printf("[Memtable]: Added [Key: %v] into [%d (%p)]\n", record.Key, Memtables.currentIndex, Memtables.tables[Memtables.currentIndex])
-	}
 	if err != nil {
 		Memtables.currentIndex = (Memtables.currentIndex + 1) % Memtables.maxTables
 		if Memtables.currentIndex == Memtables.lastIndex {
 			flush()
 			Memtables.lastIndex = (Memtables.lastIndex + 1) % Memtables.maxTables
 			_ = Memtables.tables[Memtables.currentIndex].structure.Add(record)
-			fmt.Printf("[Memtable]: Added [Key: %v] into [%d (%p)]\n", record.Key, Memtables.currentIndex, Memtables.tables[Memtables.currentIndex])
 			return
 		}
 
 		_ = Memtables.tables[Memtables.currentIndex].structure.Add(record)
-		fmt.Printf("[Memtable]: Added [Key: %v] into [%d (%p)]\n", record.Key, Memtables.currentIndex, Memtables.tables[Memtables.currentIndex])
 	}
 }
 
+// Clear deletes all memtables.
+func Clear() {
+	for _, table := range Memtables.tables {
+		table.structure.Clear()
+	}
+
+	Memtables.currentIndex = 0
+	Memtables.lastIndex = 0
+	Memtables.maxTables = 0
+	Memtables.tables = nil
+}
+
 // Delete record from structure. Returns error if key does not exist.
-func (mt *Memtable) Delete(key []byte) error {
-	return mt.structure.Delete(key)
+func Delete(key []byte) error {
+	return Memtables.tables[Memtables.currentIndex].structure.Delete(key)
 }
 
 // Get key from structure. Return error if key does not exist.
-func (mt *Memtable) Get(key []byte) (*model.Record, error) {
-	return mt.structure.Get(key)
+func Get(key []byte) (*model.Record, error) {
+	index := Memtables.currentIndex
+	for {
+		record, err := Memtables.tables[index].structure.Get(key)
+		if err == nil {
+			return record, nil
+		}
+		index = (index + 1) % Memtables.maxTables
+		if index == Memtables.currentIndex {
+			break
+		}
+	}
+	return nil, errors.New("error: key '" + string(key) + "' not found in " + util.GetConfig().Memtable.Structure)
 }
 
 func flush() {
