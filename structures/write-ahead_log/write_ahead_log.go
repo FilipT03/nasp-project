@@ -43,7 +43,9 @@ const (
 
 	HeaderSize = 8
 
-	WALPath = "wal" + string(os.PathSeparator)
+	WALPath     = "wal" + string(os.PathSeparator)
+	NumberStart = 4
+	NumberEnd   = 8
 )
 
 type Record struct {
@@ -122,29 +124,119 @@ func (wal *WAL) commitRecord(record *Record) {
 	}
 }
 
-func (wal *WAL) writeBuffer() error {
-	var returnError error
-	// first we create a []byte from records
-	newData := make([]byte, 0)
-	for _, element := range wal.buffer {
-		newData = append(newData, wal.recordToByteArray(element)...)
+func (wal *WAL) incrementWALFileName() error {
+	number, err := strconv.Atoi(wal.latestFileName[NumberStart:NumberEnd])
+	if err != nil {
+		return err
 	}
+	stringNumber := strconv.Itoa(number + 1)
+	missing := (NumberEnd - NumberStart) - len(stringNumber)
+	for missing > 0 {
+		stringNumber = "0" + stringNumber
+		missing -= 1
+	}
+	wal.latestFileName = wal.latestFileName[:NumberStart] + stringNumber + wal.latestFileName[NumberEnd:]
+	return nil
+}
+
+func (wal *WAL) writeBuffer() error {
+	toWrite := make([]byte, 0)
 
 	f, err := os.OpenFile(WALPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-
-	fi, _ := f.Stat()
-	oldSize := fi.Size()
-	if oldSize == 0 {
-		err = f.Truncate(HeaderSize + int64(len(newData)))
-	} else {
-		err = f.Truncate(fi.Size() + int64(len(newData)))
+	fStat, _ := f.Stat()
+	fSize := fStat.Size()
+	if fSize == 0 {
+		// we will look at empty files as if they contained the header, because no file can be smaller than
+		// the HeaderSize
+		fSize = HeaderSize
 	}
+	var nextHeader uint64 = 0
+	for _, element := range wal.buffer {
+		nextSlice := wal.recordToByteArray(element)
+		if uint64(len(toWrite))+uint64(len(nextSlice)) > (wal.segmentSize - uint64(fSize)) {
+			var offset uint64 = 0
+			combinedSlice := append(toWrite, nextSlice...)
+			// while there is more to write that a single file can fit
+			for uint64(len(combinedSlice))-offset > (wal.segmentSize - HeaderSize) {
+				var err error
+				err = wal.writeSlice(nextHeader, combinedSlice[offset:offset+(wal.segmentSize-uint64(fSize))], WALPath+wal.latestFileName)
+				offset += wal.segmentSize - uint64(fSize)
+				fSize = HeaderSize
+				// in case the loop continues, we need to prepare the nextHeader
+				nextHeader = wal.segmentSize - HeaderSize
+				if err != nil {
+					return err
+				}
+				// incrementing the log number
+				err = wal.incrementWALFileName()
+				if err != nil {
+					return err
+				}
+			}
+			toWrite = combinedSlice[offset:]
+			nextHeader = uint64(len(toWrite))
+		} else {
+			toWrite = append(toWrite, nextSlice...)
+			if uint64(len(toWrite)) == (wal.segmentSize - uint64(fSize)) {
+				err := wal.writeSlice(nextHeader, toWrite, WALPath+wal.latestFileName)
+				if err != nil {
+					return err
+				}
+				fSize = HeaderSize
+				nextHeader = 0
+				err = wal.incrementWALFileName()
+				if err != nil {
+					return err
+				}
+				toWrite = make([]byte, 0)
+			}
+		}
+	}
+	if len(toWrite) > 0 {
+		err := wal.writeSlice(nextHeader, toWrite, WALPath+wal.latestFileName)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writeSlice writes the byte array to the file of path. Returns error if data doesn't fit
+func (wal *WAL) writeSlice(remainderSize uint64, slice []byte, path string) error {
+	var returnError error = nil
+
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return err
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	fileSize := fi.Size()
+	if fileSize == 0 && uint64(len(slice))+uint64(HeaderSize) > wal.segmentSize {
+		return errors.New("failed to write slice, data would exceed the segment size")
+	}
+	if fileSize != 0 && uint64(len(slice))+uint64(fileSize) > wal.segmentSize {
+		return errors.New("failed to write slice, data would exceed the segment size")
+	}
+
+	if fileSize == 0 {
+		err := f.Truncate(int64(len(slice)) + int64(HeaderSize))
+		if err != nil {
+			return err
+		}
+	} else {
+		err := f.Truncate(int64(len(slice)) + fileSize)
+		if err != nil {
+			return err
+		}
 	}
 
 	mmapFile, err := mmap.Map(f, mmap.RDWR, 0)
@@ -158,14 +250,16 @@ func (wal *WAL) writeBuffer() error {
 		return err
 	}
 
-	if oldSize == 0 {
-		binary.LittleEndian.PutUint64(mmapFile[0:HeaderSize], HeaderSize)
-		copy(mmapFile[HeaderSize:], newData)
+	if fileSize == 0 {
+		binary.LittleEndian.PutUint64(mmapFile[0:HeaderSize], HeaderSize+remainderSize)
+		copy(mmapFile[HeaderSize:], slice)
 	} else {
-		copy(mmapFile[oldSize:], newData)
+		copy(mmapFile[fileSize:], slice)
 	}
-
-	return returnError
+	if returnError != nil {
+		return returnError
+	}
+	return nil
 }
 
 func (wal *WAL) GetAllRecords() ([]*Record, error) {
@@ -187,6 +281,7 @@ func (wal *WAL) GetAllRecords() ([]*Record, error) {
 		fi, _ := f.Stat()
 		fSize := fi.Size()
 		if fSize <= HeaderSize {
+			f.Close()
 			continue
 		}
 
@@ -225,13 +320,13 @@ func (wal *WAL) GetAllRecords() ([]*Record, error) {
 			}
 		}
 
-		err = f.Close()
+		err = mmapFile.Unmap()
 		if err != nil {
 			return nil, err
 		}
-		err = mmapFile.Unmap()
+		err = f.Close()
 		if err != nil {
-			returnError = err
+			return nil, err
 		}
 	}
 	return result, returnError
@@ -299,6 +394,10 @@ func createRecord(key string, value []byte, tombstone bool) *Record {
 }
 
 func printRecord(record *Record) {
+	if record == nil {
+		print("nil")
+		return
+	}
 	fmt.Printf("CRC: %d\n", record.CRC)
 	fmt.Printf("Timestamp: %d\n", record.Timestamp)
 	fmt.Printf("Tombstone: %t\n", record.Tombstone)
@@ -318,19 +417,30 @@ func CRC32(data []byte) uint32 {
 }
 
 func (wal *WAL) Test() {
-	wal.PutCommit("Test", []byte("First value"))
-	wal.PutCommit("Test2", []byte("Second value"))
+	array90 := make([]byte, 0, 90)
+	for i := 0; i < 90; i++ {
+		array90 = append(array90, byte('t'))
+	}
+	array98 := append(array90, "tttttttt"...)
+	//record120 := createRecord("T", array90, false)
+	//record128 := createRecord("P", append(array90, "tttttttt"...), false)
+	//fmt.Println(KeyStart + record120.KeySize + record120.ValueSize)
+	//fmt.Println(KeyStart + record128.KeySize + record128.ValueSize)
+	//fmt.Println(array100)
+	wal.PutCommit("T", array90)
+	wal.PutCommit("P", array98)
 	err := wal.writeBuffer()
 	if err != nil {
 		panic(err)
 	}
 	records, err := wal.GetAllRecords()
 	if err != nil {
-		print(err.Error())
+		panic(err.Error())
 	}
 	for _, record := range records {
 		printRecord(record)
 	}
+
 	/*res, err := wal.readRecord("wal_test.log", wal.segmentSize)
 	print(err)
 	printRecord(res)
