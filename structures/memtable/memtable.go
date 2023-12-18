@@ -2,7 +2,6 @@ package memtable
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"nasp-project/model"
 	"nasp-project/structures/b_tree"
@@ -30,11 +29,6 @@ var Memtables = struct {
 	maxTables    int
 	tables       []*Memtable
 }{currentIndex: 0, lastIndex: 0, maxTables: 0, tables: nil}
-
-func Debug() {
-	fmt.Printf("Current [%d] - %p\n", Memtables.currentIndex, Memtables.tables[Memtables.currentIndex])
-	fmt.Printf("Last [%d] - %p\n", Memtables.lastIndex, Memtables.tables[Memtables.lastIndex])
-}
 
 // CreateMemtables creates instances of Memtable.
 // If the structure is invalid, it creates a Skip List.
@@ -75,10 +69,6 @@ func CreateMemtables(config *util.MemtableConfig) {
 	}
 }
 
-// []		[]		[]		[]		[]
-// ^								^
-// last								curr
-
 // Add a record to the structure. Automatically switches tables if the current one is full.
 // Flushes if all tables are full.
 func Add(record *model.Record) {
@@ -89,8 +79,6 @@ func Add(record *model.Record) {
 		if Memtables.currentIndex == Memtables.lastIndex {
 			flush()
 			Memtables.lastIndex = (Memtables.lastIndex + 1) % Memtables.maxTables
-			_ = Memtables.tables[Memtables.currentIndex].structure.Add(record)
-			return
 		}
 
 		_ = Memtables.tables[Memtables.currentIndex].structure.Add(record)
@@ -122,7 +110,7 @@ func Get(key []byte) (*model.Record, error) {
 		if err == nil {
 			return record, nil
 		}
-		index = (index + 1) % Memtables.maxTables
+		index = (index - 1) % Memtables.maxTables
 		if index == Memtables.currentIndex {
 			break
 		}
@@ -132,12 +120,9 @@ func Get(key []byte) (*model.Record, error) {
 
 func flush() {
 	records := Memtables.tables[Memtables.lastIndex].structure.Flush()
-	for _, record := range records {
-		fmt.Printf("[Memtable]: Flushed [Key: %v]\n", record.Key)
-	}
 	_, err := sstable.CreateSSTable(records, util.GetConfig().SSTable)
 	if err != nil {
-		panic("error: could not flush table - " + err.Error())
+		panic(err.Error())
 	}
 	Memtables.tables[Memtables.lastIndex].structure.Clear()
 }
