@@ -202,6 +202,20 @@ func (wal *WAL) writeBuffer() error {
 			return err
 		}
 	}
+	// the latest file shouldn't be completely filled
+	f, err = os.OpenFile(WALPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	fStat, _ = f.Stat()
+	fSize = fStat.Size()
+	if uint64(fSize) == wal.segmentSize {
+		err = wal.incrementWALFileName()
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -291,6 +305,7 @@ func (wal *WAL) GetAllRecords() ([]*Record, error) {
 		}
 
 		header := binary.LittleEndian.Uint64(mmapFile[0:HeaderSize])
+		fmt.Println("header: ", header)
 		if remainderSlice != nil { // we need to combine the end of the last file and start of this one
 			record, err := wal.readRecordFromSlice(0, append(remainderSlice, mmapFile[HeaderSize:header]...))
 			if err != nil {
@@ -417,18 +432,22 @@ func CRC32(data []byte) uint32 {
 }
 
 func (wal *WAL) Test() {
-	array90 := make([]byte, 0, 90)
+	arrayT := make([]byte, 0, 90)
 	for i := 0; i < 90; i++ {
-		array90 = append(array90, byte('t'))
+		arrayT = append(arrayT, byte('t'))
 	}
-	array98 := append(array90, "tttttttt"...)
-	//record120 := createRecord("T", array90, false)
-	//record128 := createRecord("P", append(array90, "tttttttt"...), false)
+	arrayP := make([]byte, 0, 98)
+	for i := 0; i < 90; i++ {
+		arrayP = append(arrayP, byte('p'))
+	}
+	//arrayP := append(arrayT, "tttttttt"...)
+	//record120 := createRecord("T", arrayT, false)
+	//record128 := createRecord("P", append(arrayT, "tttttttt"...), false)
 	//fmt.Println(KeyStart + record120.KeySize + record120.ValueSize)
 	//fmt.Println(KeyStart + record128.KeySize + record128.ValueSize)
 	//fmt.Println(array100)
-	wal.PutCommit("T", array90)
-	wal.PutCommit("P", array98)
+	wal.PutCommit("T", arrayT)
+	wal.PutCommit("P", arrayP)
 	err := wal.writeBuffer()
 	if err != nil {
 		panic(err)
