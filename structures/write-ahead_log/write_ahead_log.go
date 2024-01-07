@@ -48,6 +48,7 @@ const (
 	NumberEnd   = 8
 )
 
+// Record structure for WAL commits
 type Record struct {
 	CRC       uint32
 	Timestamp uint64
@@ -58,6 +59,7 @@ type Record struct {
 	Value     []byte
 }
 
+// WAL - Write ahead log
 type WAL struct {
 	buffer         []*Record
 	bufferSize     uint32
@@ -65,6 +67,7 @@ type WAL struct {
 	latestFileName string
 }
 
+// NewWAL is constructor for the Write ahead log.
 func NewWAL(bufferSize uint32, segmentSize uint64) (*WAL, error) {
 	dirEntries, err := os.ReadDir(WALPath)
 	if os.IsNotExist(err) {
@@ -105,15 +108,19 @@ func NewWAL(bufferSize uint32, segmentSize uint64) (*WAL, error) {
 	}, nil
 }
 
+// PutCommit adds put commit to the WAL buffer.
 func (wal *WAL) PutCommit(key string, value []byte) {
 	newRecord := createRecord(key, value, false)
 	wal.commitRecord(newRecord)
 }
+
+// DeleteCommit adds delete commit to the WAL buffer.
 func (wal *WAL) DeleteCommit(key string, value []byte) {
 	newRecord := createRecord(key, value, true)
 	wal.commitRecord(newRecord)
 }
 
+// commitRecord adds record to the buffer, and calls writeBuffer if it's full.
 func (wal *WAL) commitRecord(record *Record) {
 	wal.buffer = append(wal.buffer, record)
 	if uint32(len(wal.buffer)) >= wal.bufferSize {
@@ -124,6 +131,7 @@ func (wal *WAL) commitRecord(record *Record) {
 	}
 }
 
+// incrementWALFileName increments WAL latestFileName by one.
 func (wal *WAL) incrementWALFileName() error {
 	number, err := strconv.Atoi(wal.latestFileName[NumberStart:NumberEnd])
 	if err != nil {
@@ -139,6 +147,7 @@ func (wal *WAL) incrementWALFileName() error {
 	return nil
 }
 
+// writeBuffer writes records from the buffer and creates new files when necessary. Doesn't clear the buffer.
 func (wal *WAL) writeBuffer() error {
 	toWrite := make([]byte, 0)
 
@@ -236,7 +245,7 @@ func (wal *WAL) writeBuffer() error {
 	return nil
 }
 
-// writeSlice writes the byte array to the file of path. Returns error if data doesn't fit
+// writeSlice writes the byte array to the file of path. Returns error if data doesn't fit.
 func (wal *WAL) writeSlice(remainderSize uint64, slice []byte, path string) error {
 	var returnError error = nil
 
@@ -293,6 +302,7 @@ func (wal *WAL) writeSlice(remainderSize uint64, slice []byte, path string) erro
 	return nil
 }
 
+// GetAllRecords reads record from WAL files and returns them.
 func (wal *WAL) GetAllRecords() ([]*Record, error) {
 	var returnError error = nil
 	dirEntries, err := os.ReadDir(WALPath)
@@ -364,8 +374,8 @@ func (wal *WAL) GetAllRecords() ([]*Record, error) {
 	return result, returnError
 }
 
-// readRecord reads record from slice with offset. Returns the read record and error if any occurred. Returns nil record
-// if it can't read the whole record from the slice.
+// readRecord reads Record from slice with offset. Returns the read Record and error if any occurred. Returns nil record
+// if it can't read the whole Record from the slice.
 func (wal *WAL) readRecordFromSlice(offset uint64, slice []byte) (*Record, error) {
 	result := &Record{}
 
@@ -395,6 +405,7 @@ func (wal *WAL) readRecordFromSlice(offset uint64, slice []byte) (*Record, error
 	return result, nil
 }
 
+// recordToByteArray converts Record to byte array.
 func (wal *WAL) recordToByteArray(record *Record) []byte {
 	result := make([]byte, 0)
 	result = binary.LittleEndian.AppendUint32(result, CRC32(record.Value))
@@ -413,6 +424,7 @@ func (wal *WAL) recordToByteArray(record *Record) []byte {
 	return result
 }
 
+// createRecord constructs Record.
 func createRecord(key string, value []byte, tombstone bool) *Record {
 	return &Record{
 		CRC:       CRC32(value),              //Generate CRC
@@ -425,6 +437,7 @@ func createRecord(key string, value []byte, tombstone bool) *Record {
 	}
 }
 
+// printRecord prints Record in a readable format.
 func printRecord(record *Record) {
 	if record == nil {
 		print("nil")
@@ -444,6 +457,7 @@ func printRecord(record *Record) {
 	fmt.Println()
 }
 
+// CRC32 calculates CRC checksum for the given byte array.
 func CRC32(data []byte) uint32 {
 	return crc32.ChecksumIEEE(data)
 }
