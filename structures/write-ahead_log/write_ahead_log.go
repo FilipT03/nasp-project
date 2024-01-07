@@ -146,14 +146,31 @@ func (wal *WAL) writeBuffer() error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	fStat, _ := f.Stat()
 	fSize := fStat.Size()
+	if uint64(fSize) == wal.segmentSize {
+		err = f.Close()
+		if err != nil {
+			return err
+		}
+		err = wal.incrementWALFileName()
+		if err != nil {
+			return err
+		}
+		f, err := os.OpenFile(WALPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
+		if err != nil {
+			return err
+		}
+		fStat, _ = f.Stat()
+		fSize = fStat.Size()
+	}
+	defer f.Close()
 	if fSize == 0 {
 		// we will look at empty files as if they contained the header, because no file can be smaller than
 		// the HeaderSize
 		fSize = HeaderSize
 	}
+
 	var nextHeader uint64 = 0
 	for _, element := range wal.buffer {
 		nextSlice := wal.recordToByteArray(element)
