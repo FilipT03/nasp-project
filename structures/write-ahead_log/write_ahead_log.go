@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/edsrzf/mmap-go"
-	"hash/crc32"
+	"nasp-project/util"
 	"os"
 	"strconv"
 	"time"
@@ -399,7 +399,7 @@ func (wal *WAL) readRecordFromSlice(offset uint64, slice []byte) (*Record, error
 	result.Value = make([]byte, result.ValueSize)
 	copy(result.Value, slice[(offset+KeyStart+result.KeySize):(offset+KeyStart+result.KeySize+result.ValueSize)])
 
-	if CRC32(result.Value) != result.CRC {
+	if util.CRC32(result.Value) != result.CRC {
 		return nil, errors.New("failed to read record of offset" + strconv.FormatUint(offset, 10) + ": CRCs don't match")
 	}
 	return result, nil
@@ -408,7 +408,7 @@ func (wal *WAL) readRecordFromSlice(offset uint64, slice []byte) (*Record, error
 // recordToByteArray converts Record to byte array.
 func (wal *WAL) recordToByteArray(record *Record) []byte {
 	result := make([]byte, 0)
-	result = binary.LittleEndian.AppendUint32(result, CRC32(record.Value))
+	result = binary.LittleEndian.AppendUint32(result, util.CRC32(record.Value))
 	result = binary.LittleEndian.AppendUint64(result, record.Timestamp)
 	if record.Tombstone {
 		result = append(result, byte(1))
@@ -427,7 +427,7 @@ func (wal *WAL) recordToByteArray(record *Record) []byte {
 // createRecord constructs Record.
 func createRecord(key string, value []byte, tombstone bool) *Record {
 	return &Record{
-		CRC:       CRC32(value),              //Generate CRC
+		CRC:       util.CRC32(value),         //Generate CRC
 		Timestamp: uint64(time.Now().Unix()), //Get current time
 		Tombstone: tombstone,
 		KeySize:   uint64(len(key)),
@@ -455,11 +455,6 @@ func printRecord(record *Record) {
 		//fmt.Print(" ")
 	}
 	fmt.Println()
-}
-
-// CRC32 calculates CRC checksum for the given byte array.
-func CRC32(data []byte) uint32 {
-	return crc32.ChecksumIEEE(data)
 }
 
 func (wal *WAL) Test() {
