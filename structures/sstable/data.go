@@ -3,7 +3,9 @@ package sstable
 import (
 	bytesUtil "bytes"
 	"encoding/binary"
+	"errors"
 	"nasp-project/model"
+	"nasp-project/util"
 	"os"
 )
 
@@ -39,15 +41,41 @@ type DataBlock struct {
 	Block // Only block because nothing is ever loaded into memory
 }
 
+// getCRC calculates the CRC checksum of a given record
+func getCRC(record *model.Record) uint32 {
+	bytes := make([]byte, 9)
+	binary.LittleEndian.PutUint64(bytes[:8], record.Timestamp)
+	if record.Tombstone {
+		bytes[8] = 1
+	} else {
+		bytes[8] = 0
+	}
+	bytes = append(bytes, record.Key...)
+	if !record.Tombstone {
+		bytes = append(bytes, record.Value...)
+	}
+	return util.CRC32(bytes)
+}
+
+func (dr *DataRecord) isCRCValid() bool {
+	rec := model.Record{
+		Key:       dr.Key,
+		Value:     dr.Value,
+		Tombstone: dr.Tombstone,
+		Timestamp: dr.Timestamp,
+	}
+	return getCRC(&rec) == dr.CRC
+}
+
 func dataRecordsFromRecords(recs []model.Record) []DataRecord {
 	dataRecs := make([]DataRecord, len(recs))
 	for i, rec := range recs {
-		// TODO: Compute CRC
 		dataRecs[i] = DataRecord{
 			Key:       rec.Key,
 			Value:     rec.Value,
 			Tombstone: rec.Tombstone,
 			Timestamp: rec.Timestamp,
+			CRC:       getCRC(&rec),
 		}
 	}
 	return dataRecs
@@ -199,13 +227,18 @@ func getNextRecord(file *os.File) (*DataRecord, error) {
 		}
 	}
 
-	return &DataRecord{
+	rec := &DataRecord{
 		CRC:       crc,
 		Tombstone: tombstone,
 		Key:       key,
 		Value:     value,
 		Timestamp: timestamp,
-	}, nil
+	}
+
+	if !rec.isCRCValid() {
+		return rec, errors.New("CRC check failed")
+	}
+	return rec, nil
 }
 
 // getRecordAtOffset reads a record from the data block file at the given offset.
