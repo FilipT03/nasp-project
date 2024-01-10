@@ -18,6 +18,7 @@ type Config struct {
 
 type WALConfig struct {
 	SegmentSize int `yaml:"segmentSize"`
+	BufferSize  int `yaml:"bufferSize"`
 }
 
 type MemtableConfig struct {
@@ -55,7 +56,8 @@ type CacheConfig struct {
 
 var config = &Config{
 	WAL: WALConfig{
-		SegmentSize: 512,
+		SegmentSize: 32768,
+		BufferSize:  8,
 	},
 	Memtable: MemtableConfig{
 		MaxSize:   1024,
