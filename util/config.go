@@ -10,7 +10,7 @@ import (
 
 type Config struct {
 	WAL      WALConfig      `yaml:"WAL"`
-	MemTable MemTableConfig `yaml:"MemTable"`
+	Memtable MemtableConfig `yaml:"Memtable"`
 	SSTable  SSTableConfig  `yaml:"SSTable"`
 	LSMTree  LSMTreeConfig  `yaml:"LMS"`
 	Cache    CacheConfig    `yaml:"Cache"`
@@ -20,10 +20,20 @@ type WALConfig struct {
 	SegmentSize int `yaml:"segmentSize"`
 }
 
-type MemTableConfig struct {
-	MaxSize   int    `yaml:"maxSize"`
-	Structure string `yaml:"structure"`
-	Instances int    `yaml:"instances"`
+type MemtableConfig struct {
+	MaxSize   int            `yaml:"maxSize"`
+	Structure string         `yaml:"structure"`
+	Instances int            `yaml:"instances"`
+	SkipList  SkipListConfig `yaml:"SkipList"`
+	BTree     BTreeConfig    `yaml:"BTree"`
+}
+
+type BTreeConfig struct {
+	MinSize int `yaml:"minSize"`
+}
+
+type SkipListConfig struct {
+	MaxHeight int `yaml:"maxHeight"`
 }
 
 type SSTableConfig struct {
@@ -47,10 +57,16 @@ var config = &Config{
 	WAL: WALConfig{
 		SegmentSize: 512,
 	},
-	MemTable: MemTableConfig{
+	Memtable: MemtableConfig{
 		MaxSize:   1024,
 		Structure: "SkipList",
 		Instances: 1,
+		BTree: BTreeConfig{
+			MinSize: 16,
+		},
+		SkipList: SkipListConfig{
+			MaxHeight: 32,
+		},
 	},
 	SSTable: SSTableConfig{
 		SavePath:        "./data",
@@ -80,10 +96,7 @@ func LoadConfig(path string) *Config {
 		return config
 	}
 
-	err = yaml.Unmarshal(file, &config)
-	if err != nil {
-		return config
-	}
+	_ = yaml.Unmarshal(file, &config)
 	return config
 }
 
