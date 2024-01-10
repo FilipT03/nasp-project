@@ -40,7 +40,7 @@ func (LRU *LRUCache) get(key uint64) *list.Element {
 
 	value, ok := LRU.cache[key]
 	if ok {
-		//TODO update to most recent
+		LRU.list.MoveToFront(value)
 		return value
 	}
 	return nil
