@@ -17,3 +17,4 @@ LSMTree:
     maxLevel: 4
 Cache:
     maxSize: 1024
+
