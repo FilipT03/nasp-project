@@ -14,6 +14,7 @@ import (
 type Node struct {
 	left  Hashable
 	right Hashable
+	value Hashable
 }
 
 // EmptyBlock struct to represent empty block
@@ -28,8 +29,9 @@ type Block []byte
 // MerkleTree struct to represent Merkle tree
 // it will contain hash function and root node
 type MerkleTree struct {
-	hash hashFn.SeededHash
-	root Hashable
+	hash     hashFn.SeededHash
+	root     Hashable
+	nodeList []Hashable
 }
 
 // NewMerkleTree Function to create new Merkle tree from SSTable
@@ -55,15 +57,61 @@ func NewMerkleTree(ssTable sstable.SSTable, chunkSize int) MerkleTree {
 	hFilter := readFile(filterPath, chunkSize)
 	hashedData = append(hashedData, hFilter...)
 
+	root := _createMerkleTree(hashedData)
 	merkleTree := MerkleTree{
-		hash: hashFn.NewSeededHash(1),
-		root: _createMerkleTree(hashedData),
+		hash:     hashFn.NewSeededHash(1),
+		root:     _createMerkleTree(hashedData),
+		nodeList: levelOrderTraversal(root),
 	}
 	return merkleTree
 }
 
+// LevelOrderTraversal function to traverse Merkle tree level by level
+// it will return list of nodes in level order
+// used for saving merkle tree to a file
+func levelOrderTraversal(root Hashable) []Hashable {
+	if root == nil {
+		return nil
+	}
+	var queue = make([]Hashable, 0)
+	var nodeList = make([]Hashable, 0)
+	// Push to the queue
+	queue = append(queue, root)
+	// Loop until queue is empty
+	for len(queue) > 0 {
+		// Top (just get next element, don't remove it)
+		// if my top is a node, then add it to the list
+		// if I got all to the bottom my leafs will be added to the list
+		// they are not node type they are Hash type, and they must be added to the list
+		top := queue[0]
+		if node, ok := queue[0].(Node); ok {
+			nodeList = append(nodeList, node.value)
+			// Pop
+			queue = queue[1:]
+		} else if node, ok := queue[0].(Hash); ok {
+			nodeList = append(nodeList, node)
+			// Pop
+			queue = queue[1:]
+			continue
+		} else {
+			break
+		}
+
+		if node, ok := top.(Node); ok {
+			if node.left != nil {
+				queue = append(queue, node.left)
+			}
+			if node.right != nil {
+				queue = append(queue, node.right)
+			}
+		}
+
+	}
+	return nodeList
+}
+
 // readFile function to read file chunk by chunk
-// and hash them immediately so we don't have to store them in memory
+// and hash them immediately, so we don't have to store them in memory
 func readFile(path string, chunkSize int) []Hashable {
 	// return hashed data
 	// will read every file chunk by chunk and hash them immediately
@@ -99,9 +147,17 @@ func _createMerkleTree(values []Hashable) Hashable {
 
 	for i := 0; i < len(values); i += 2 {
 		if i+1 < len(values) {
-			nodes = append(nodes, Node{left: values[i], right: values[i+1]})
+			v1 := values[i].hash()
+			v2 := values[i+1].hash()
+			concatenatedData := append(v1[:], v2[:]...)
+			hashedData := hash(concatenatedData)
+			nodes = append(nodes, Node{left: values[i], right: values[i+1], value: hashedData})
 		} else {
-			nodes = append(nodes, Node{left: values[i], right: EmptyBlock{}})
+			v1 := values[i].hash()
+			v2 := EmptyBlock{}.hash()
+			concatenatedData := append(v1[:], v2[:]...)
+			hashedData := hash(concatenatedData)
+			nodes = append(nodes, Node{left: values[i], right: EmptyBlock{}, value: hashedData})
 		}
 	}
 	if len(nodes) == 1 {
@@ -114,7 +170,7 @@ func _createMerkleTree(values []Hashable) Hashable {
 }
 
 // Contains function to check if Merkle tree contains a node
-// it will check if root is equal to node and then
+// it will check if root is equal to node, and then
 // it will check if any of the children are equal to node using _dfs function
 func (merkle MerkleTree) Contains(node Hashable) bool {
 	root := merkle.root
@@ -126,7 +182,7 @@ func (merkle MerkleTree) Contains(node Hashable) bool {
 }
 
 // _dfs function to check if any of the children are equal to node
-// it will check if left child is equal to node and then
+// it will check if left child is equal to node, and then
 // it will check if right child is equal to node recursively
 func _dfs(root Hashable, node Hashable) bool {
 	if root == nil {
@@ -155,7 +211,7 @@ func (merkle MerkleTree) Equal(other MerkleTree) []Hashable {
 }
 
 // _equalNodes function to check if two nodes are equal
-// it will check if left child is equal to node and then
+// it will check if left child is equal to node, and then
 // it will check if right child is equal to node recursively
 func _equalNodes(merkleNode Node, otherNode Node) []Hashable {
 	if merkleNode.hash() == otherNode.hash() {
@@ -188,7 +244,7 @@ func (EmptyBlock) hash() Hash {
 }
 
 func (h Hash) hash() Hash {
-	return h
+	return sha1.Sum(h[:])
 }
 
 func hash(data []byte) Hash {

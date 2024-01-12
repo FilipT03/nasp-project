@@ -54,7 +54,7 @@ func createTestSSTable(t *testing.T) sstable.SSTable {
 
 	config := util.SSTableConfig{
 		SavePath:        tmpDir,
-		SingleFile:      true,
+		SingleFile:      false,
 		IndexDegree:     2,
 		SummaryDegree:   3,
 		FilterPrecision: 0.01,
