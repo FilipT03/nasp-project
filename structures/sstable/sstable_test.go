@@ -18,11 +18,12 @@ func TestCreateSSTableSingleFile(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	config := util.SSTableConfig{
-		SavePath:        tmpDir,
-		SingleFile:      true,
-		IndexDegree:     2,
-		SummaryDegree:   3,
-		FilterPrecision: 0.01,
+		SavePath:            tmpDir,
+		SingleFile:          true,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
 	}
 
 	// Create some sample data records.
@@ -62,11 +63,12 @@ func TestCreateSSTableMultiFile(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	config := util.SSTableConfig{
-		SavePath:        tmpDir,
-		SingleFile:      false,
-		IndexDegree:     2,
-		SummaryDegree:   3,
-		FilterPrecision: 0.01,
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
 	}
 
 	// Create some sample data records.
@@ -124,11 +126,12 @@ func TestCreateSSTableSecond(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	config := util.SSTableConfig{
-		SavePath:        tmpDir,
-		SingleFile:      false,
-		IndexDegree:     2,
-		SummaryDegree:   3,
-		FilterPrecision: 0.01,
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
 	}
 
 	// Create some sample data records.
@@ -192,11 +195,12 @@ func TestOpenSSTableFromTOC(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	config := util.SSTableConfig{
-		SavePath:        tmpDir,
-		SingleFile:      false,
-		IndexDegree:     2,
-		SummaryDegree:   3,
-		FilterPrecision: 0.01,
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
 	}
 
 	// Create some sample data records.
@@ -256,11 +260,12 @@ func TestDeleteFiles(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	config := util.SSTableConfig{
-		SavePath:        tmpDir,
-		SingleFile:      false,
-		IndexDegree:     2,
-		SummaryDegree:   3,
-		FilterPrecision: 0.01,
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
 	}
 
 	// Create some sample data records.
@@ -321,11 +326,12 @@ func TestSSTable_Read(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	config := util.SSTableConfig{
-		SavePath:        tmpDir,
-		SingleFile:      false,
-		IndexDegree:     2,
-		SummaryDegree:   3,
-		FilterPrecision: 0.01,
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
 	}
 
 	// Create some sample data records.
@@ -365,11 +371,12 @@ func TestMergeSSTables(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	config := util.SSTableConfig{
-		SavePath:        tmpDir,
-		SingleFile:      false,
-		IndexDegree:     2,
-		SummaryDegree:   3,
-		FilterPrecision: 0.01,
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
 	}
 
 	// Create some sample data records.
@@ -443,11 +450,12 @@ func TestMergeSSTablesSameKey(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	config := util.SSTableConfig{
-		SavePath:        tmpDir,
-		SingleFile:      false,
-		IndexDegree:     2,
-		SummaryDegree:   3,
-		FilterPrecision: 0.01,
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
 	}
 
 	// Create some sample data records.
