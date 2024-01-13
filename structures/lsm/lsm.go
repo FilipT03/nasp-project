@@ -3,6 +3,7 @@ package lsm
 import (
 	"fmt"
 	"nasp-project/model"
+	"nasp-project/structures/lsm/size_tiered_compaction"
 	"nasp-project/structures/sstable"
 	"nasp-project/util"
 	"os"
@@ -53,9 +54,9 @@ func Read(key []byte, config *util.Config) (*model.Record, error) {
 
 // Compact compacts the LSM tree by merging SSTables from the same level.
 // The compaction algorithm used is determined by the config.
-func Compact(config *util.LSMTreeConfig) error {
+func Compact(config *util.LSMTreeConfig, sstConfig *util.SSTableConfig) error {
 	if config.CompactionAlgorithm == "Size-Tiered" {
-		// TODO: Implement
+		size_tiered_compaction.Compact(sstConfig, config)
 	} else if config.CompactionAlgorithm == "Leveled" {
 		// TODO: Implement
 	}

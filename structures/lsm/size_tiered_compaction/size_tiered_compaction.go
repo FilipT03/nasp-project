@@ -8,9 +8,11 @@ import (
 )
 
 // Compact performs compaction on the LSM tree.
-func Compact(sstableConfig *util.SSTableConfig, lsmConfig *util.LSMTreeConfig, maxLsmNodesPerLevel int) {
+func Compact(sstableConfig *util.SSTableConfig, lsmConfig *util.LSMTreeConfig) {
 	// maximum number of levels in the LSM tree
 	maxLsmLevel := lsmConfig.MaxLevel
+	// maximum number of SSTables in each level of the LSM Tree
+	maxLsmNodesPerLevel := lsmConfig.MaxLsmNodesPerLevel
 	// filepath
 	filepath := sstableConfig.SavePath
 
