@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	hashFn "nasp-project/structures/hash"
-	"nasp-project/structures/sstable"
+	"nasp-project/util"
 	"os"
 )
 
@@ -35,27 +35,14 @@ type MerkleTree struct {
 }
 
 // NewMerkleTree Function to create new Merkle tree from SSTable
-// It will read all data from SSTable and hash them
+// It will read all data from every file passed as a parameter and hash them
 // and then create Merkle tree from hashed data
-// main function to use
-func NewMerkleTree(ssTable sstable.SSTable, chunkSize int) MerkleTree {
+func NewMerkleTree(files []util.BinaryFile, chunkSize int64) MerkleTree {
 	var hashedData []Hashable
-	dataPath := ssTable.Data.Filename
-	indexPath := ssTable.Index.Filename
-	summaryPath := ssTable.Summary.Filename
-	filterPath := ssTable.Filter.Filename
-	// read data from file
-	hData := readFile(dataPath, chunkSize)
-	hashedData = append(hashedData, hData...)
-	// read index from file
-	hIndex := readFile(indexPath, chunkSize)
-	hashedData = append(hashedData, hIndex...)
-	// read summary from file
-	hSummary := readFile(summaryPath, chunkSize)
-	hashedData = append(hashedData, hSummary...)
-	// read filter from file
-	hFilter := readFile(filterPath, chunkSize)
-	hashedData = append(hashedData, hFilter...)
+	for _, file := range files {
+		h := readFile(file, chunkSize)
+		hashedData = append(hashedData, h...)
+	}
 
 	root := _createMerkleTree(hashedData)
 	merkleTree := MerkleTree{
@@ -112,30 +99,43 @@ func levelOrderTraversal(root Hashable) []Hashable {
 
 // readFile function to read file chunk by chunk
 // and hash them immediately, so we don't have to store them in memory
-func readFile(path string, chunkSize int) []Hashable {
+func readFile(inFile util.BinaryFile, chunkSize int64) []Hashable {
 	// return hashed data
 	// will read every file chunk by chunk and hash them immediately
 	var hashedData []Hashable
-	file, err := os.Open(path)
+	file, err := os.Open(inFile.Filename)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return nil
 	}
-	//defer file.Close()
+	defer file.Close()
 
-	for {
+	_, err = file.Seek(inFile.StartOffset, 0)
+	if err != nil {
+		return nil
+	}
+
+	var totalRead int64 = 0
+	for totalRead < inFile.Size {
 		chunk := make([]byte, chunkSize)
 		n, err := file.Read(chunk)
 		if err == io.EOF {
 			if n != 0 {
 				hashedData = append(hashedData, hash(chunk[:n]))
+				totalRead += int64(n)
 			}
 			break
 		} else if err != nil {
 			fmt.Println("Error opening file:", err)
 			return nil
 		}
-		hashedData = append(hashedData, hash(chunk))
+		if totalRead+int64(n) > inFile.Size {
+			hashedData = append(hashedData, hash(chunk[:inFile.Size-totalRead]))
+			totalRead = inFile.Size
+			break
+		}
+		hashedData = append(hashedData, hash(chunk[:n]))
+		totalRead += int64(n)
 	}
 	return hashedData
 }
@@ -208,6 +208,14 @@ func _dfs(root Hashable, node Hashable) bool {
 func (merkle MerkleTree) Equal(other MerkleTree) []Hashable {
 
 	return _equalNodes(merkle.root.(Node), other.root.(Node))
+}
+
+func (merkle MerkleTree) Serialize() string {
+	s := ""
+	for _, node := range merkle.nodeList {
+		s += fmt.Sprintf("%x ", node.hash())
+	}
+	return s
 }
 
 // _equalNodes function to check if two nodes are equal

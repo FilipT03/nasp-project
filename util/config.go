@@ -27,12 +27,13 @@ type MemTableConfig struct {
 }
 
 type SSTableConfig struct {
-	SavePath        string  `yaml:"savePath"`
-	SingleFile      bool    `yaml:"singleFile"`
-	SummaryDegree   int     `yaml:"summaryDegree"`
-	IndexDegree     int     `yaml:"indexDegree"`
-	Compression     bool    `yaml:"compression"`
-	FilterPrecision float64 `yaml:"filterPrecision"`
+	SavePath            string  `yaml:"savePath"`
+	SingleFile          bool    `yaml:"singleFile"`
+	SummaryDegree       int     `yaml:"summaryDegree"`
+	IndexDegree         int     `yaml:"indexDegree"`
+	Compression         bool    `yaml:"compression"`
+	FilterPrecision     float64 `yaml:"filterPrecision"`
+	MerkleTreeChunkSize int64   `yaml:"merkleTreeChunkSize"`
 }
 
 type LSMTreeConfig struct {
@@ -53,12 +54,13 @@ var config = &Config{
 		Instances: 1,
 	},
 	SSTable: SSTableConfig{
-		SavePath:        "./data",
-		SingleFile:      false,
-		SummaryDegree:   5,
-		IndexDegree:     5,
-		Compression:     true,
-		FilterPrecision: 0.01,
+		SavePath:            "./data",
+		SingleFile:          false,
+		SummaryDegree:       5,
+		IndexDegree:         5,
+		Compression:         true,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 1024,
 	},
 	LSMTree: LSMTreeConfig{
 		MaxLevel: 4,
