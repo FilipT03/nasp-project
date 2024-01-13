@@ -3,12 +3,13 @@ package sstable
 import (
 	"encoding/binary"
 	"nasp-project/structures/bloom_filter"
+	"nasp-project/util"
 	"os"
 )
 
 // FilterBlock represents a filter block in an SSTable
 type FilterBlock struct {
-	Block
+	util.BinaryFile
 	Filter *bloom_filter.BloomFilter // Lazy loaded filter
 }
 

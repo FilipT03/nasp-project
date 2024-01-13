@@ -38,7 +38,7 @@ type DataRecord struct {
 
 // DataBlock represents a data block in an SSTable.
 type DataBlock struct {
-	Block // Only block because nothing is ever loaded into memory
+	util.BinaryFile // Only file block because nothing is ever loaded into memory
 }
 
 // getCRC calculates the CRC checksum of a given record

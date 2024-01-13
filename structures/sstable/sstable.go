@@ -35,23 +35,23 @@ func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
 		// Starting offset for each block is calculated after the previous block is written.
 		sstable = &SSTable{
 			Data: DataBlock{
-				Block{
+				util.BinaryFile{
 					Filename:    filepath.Join(path, "usertable-"+label+"-SSTable.db"),
 					StartOffset: 0,
 				},
 			},
 			Index: IndexBlock{
-				Block{
+				util.BinaryFile{
 					Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
 				},
 			},
 			Summary: SummaryBlock{
-				Block: Block{
+				BinaryFile: util.BinaryFile{
 					Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
 				},
 			},
 			Filter: FilterBlock{
-				Block: Block{
+				BinaryFile: util.BinaryFile{
 					Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
 				},
 			},
@@ -61,25 +61,25 @@ func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
 	} else {
 		sstable = &SSTable{
 			Data: DataBlock{
-				Block{
+				util.BinaryFile{
 					Filename:    filepath.Join(path, "usertable-"+label+"-Data.db"),
 					StartOffset: 0,
 				},
 			},
 			Index: IndexBlock{
-				Block{
+				util.BinaryFile{
 					Filename:    filepath.Join(path, "usertable-"+label+"-Index.db"),
 					StartOffset: 0,
 				},
 			},
 			Summary: SummaryBlock{
-				Block: Block{
+				BinaryFile: util.BinaryFile{
 					Filename:    filepath.Join(path, "usertable-"+label+"-Summary.db"),
 					StartOffset: 0,
 				},
 			},
 			Filter: FilterBlock{
-				Block: Block{
+				BinaryFile: util.BinaryFile{
 					Filename:    filepath.Join(path, "usertable-"+label+"-Filter.db"),
 					StartOffset: 0,
 				},
@@ -373,7 +373,7 @@ func OpenSSTableFromToc(tocPath string) (*SSTable, error) {
 		switch i {
 		case 0:
 			sstable.Data = DataBlock{
-				Block{
+				util.BinaryFile{
 					Filename:    filename,
 					StartOffset: startOffset,
 					Size:        size,
@@ -381,7 +381,7 @@ func OpenSSTableFromToc(tocPath string) (*SSTable, error) {
 			}
 		case 1:
 			sstable.Index = IndexBlock{
-				Block{
+				util.BinaryFile{
 					Filename:    filename,
 					StartOffset: startOffset,
 					Size:        size,
@@ -389,7 +389,7 @@ func OpenSSTableFromToc(tocPath string) (*SSTable, error) {
 			}
 		case 2:
 			sstable.Summary = SummaryBlock{
-				Block: Block{
+				BinaryFile: util.BinaryFile{
 					Filename:    filename,
 					StartOffset: startOffset,
 					Size:        size,
@@ -397,7 +397,7 @@ func OpenSSTableFromToc(tocPath string) (*SSTable, error) {
 			}
 		case 3:
 			sstable.Filter = FilterBlock{
-				Block: Block{
+				BinaryFile: util.BinaryFile{
 					Filename:    filename,
 					StartOffset: startOffset,
 					Size:        size,
@@ -471,8 +471,6 @@ func (sst *SSTable) Read(key []byte) (*model.Record, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: Check CRC
 
 	return &model.Record{
 		Key:       dr.Key,
