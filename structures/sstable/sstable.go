@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"nasp-project/model"
+	"nasp-project/structures/merkle_tree"
 	"nasp-project/util"
 	"os"
 	"path/filepath"
@@ -144,11 +145,42 @@ func CreateSSTable(records []model.Record, config util.SSTableConfig) (*SSTable,
 	}
 	sstable.Filter.Filter = nil
 
-	// TODO: Write Merkle Tree to Metadata file
+	files := sstable.toBinaryFiles()
+	merkleTree := merkle_tree.NewMerkleTree(files, config.MerkleTreeChunkSize)
+	file, err := os.Create(sstable.MetadataFilename)
+	_, err = file.WriteString(merkleTree.Serialize())
+	if err != nil {
+		return nil, err
+	}
 
 	err = sstable.writeTOCFile()
 
 	return sstable, nil
+}
+
+func (sst *SSTable) toBinaryFiles() []util.BinaryFile {
+	return []util.BinaryFile{
+		{
+			Filename:    sst.Data.Filename,
+			StartOffset: sst.Data.StartOffset,
+			Size:        sst.Data.Size,
+		},
+		{
+			Filename:    sst.Index.Filename,
+			StartOffset: sst.Index.StartOffset,
+			Size:        sst.Index.Size,
+		},
+		{
+			Filename:    sst.Summary.Filename,
+			StartOffset: sst.Summary.StartOffset,
+			Size:        sst.Summary.Size,
+		},
+		{
+			Filename:    sst.Filter.Filename,
+			StartOffset: sst.Filter.StartOffset,
+			Size:        sst.Filter.Size,
+		},
+	}
 }
 
 // getNextSStableLabel finds the largest label number in the given path and returns the next label number.
@@ -494,7 +526,13 @@ func MergeSSTables(sst1, sst2 *SSTable, level int, config util.SSTableConfig) (*
 	}
 	sstable.Filter.Filter = nil
 
-	// TODO: Write Merkle Tree to Metadata file
+	files := sstable.toBinaryFiles()
+	merkleTree := merkle_tree.NewMerkleTree(files, config.MerkleTreeChunkSize)
+	file, err := os.Create(sstable.MetadataFilename)
+	_, err = file.WriteString(merkleTree.Serialize())
+	if err != nil {
+		return nil, err
+	}
 
 	err = sstable.writeTOCFile()
 
