@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"nasp-project/model"
 	"nasp-project/structures/lru_cache"
 	"nasp-project/structures/lsm"
@@ -44,20 +45,29 @@ func NewKeyValueStore() (*KeyValueStore, error) {
 
 // Get returns a value associated with the specified key from the database.
 // Returns nil if the key is not found.
-// Returns an error if the read fails.
+// Returns an error if the read fails or the rate limit is reached.
 func (kvs *KeyValueStore) Get(key string) ([]byte, error) {
+	if kvs.rateLimitReached() {
+		return nil, errors.New("rate limit reached")
+	}
 	return kvs.get(key)
 }
 
 // Put saves a key-value pair to the database.
-// Returns an error if the write fails.
+// Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) Put(key string, value []byte) error {
+	if kvs.rateLimitReached() {
+		return errors.New("rate limit reached")
+	}
 	return kvs.put(key, value)
 }
 
 // Delete deletes a value associated with the specified key from the database.
-// Returns an error if the write fails.
+// Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) Delete(key string) error {
+	if kvs.rateLimitReached() {
+		return errors.New("rate limit reached")
+	}
 	return kvs.delete(key)
 }
 
