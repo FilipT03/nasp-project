@@ -256,3 +256,7 @@ func (sl *SkipList) searchForKey(key string) *skipListNode {
 	}
 	return currentNode
 }
+
+func (sl *SkipList) IsFull() bool {
+	return sl.size == sl.maxSize
+}
