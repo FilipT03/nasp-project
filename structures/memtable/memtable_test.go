@@ -7,43 +7,60 @@ import (
 )
 
 func add() {
-	Add(&model.Record{
+	err := Add(&model.Record{
 		Key:       []byte("1"),
 		Value:     nil,
 		Tombstone: false,
 		Timestamp: 0,
 	})
-	Add(&model.Record{
+	if err != nil {
+		panic(err)
+	}
+	err = Add(&model.Record{
 		Key:       []byte("5"),
 		Value:     nil,
 		Tombstone: false,
 		Timestamp: 0,
 	})
-	Add(&model.Record{
+	if err != nil {
+		panic(err)
+	}
+	err = Add(&model.Record{
 		Key:       []byte("7"),
 		Value:     nil,
 		Tombstone: false,
 		Timestamp: 0,
 	})
-
-	Add(&model.Record{
+	if err != nil {
+		panic(err)
+	}
+	err = Add(&model.Record{
 		Key:       []byte("8"),
 		Value:     nil,
 		Tombstone: false,
 		Timestamp: 0,
 	})
-	Add(&model.Record{
+	if err != nil {
+		panic(err)
+	}
+	err = Add(&model.Record{
 		Key:       []byte("4"),
 		Value:     nil,
 		Tombstone: false,
 		Timestamp: 0,
 	})
-	Add(&model.Record{
+	if err != nil {
+		panic(err)
+	}
+	err = Add(&model.Record{
 		Key:       []byte("2"),
 		Value:     nil,
 		Tombstone: false,
 		Timestamp: 0,
 	})
+	if err != nil {
+		panic(err)
+	}
 }
 
 func testLogicalDelete(t *testing.T, structure string) {
@@ -76,12 +93,16 @@ func TestTableSwitch(t *testing.T) {
 	util.GetConfig().Memtable.MaxSize = 3
 	CreateMemtables(&util.GetConfig().Memtable)
 	add()
-	Add(&model.Record{
+	err := Add(&model.Record{
 		Key:       []byte("a"),
 		Value:     nil,
 		Tombstone: false,
 		Timestamp: 0,
 	})
+
+	if err != nil {
+		t.Errorf("error: [%s]", err.Error())
+	}
 
 	if Memtables.currentIndex != 2 {
 		t.Errorf("error: expected current table to be %d, but got %d", 2, Memtables.currentIndex)

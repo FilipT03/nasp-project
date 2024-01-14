@@ -356,3 +356,7 @@ func (n *Node) split(modifiedNode *Node, index int) {
 func (n *Node) isLeaf() bool {
 	return len(n.children) == 0
 }
+
+func (bt *BTree) IsFull() bool {
+	return bt.size == bt.capacity
+}

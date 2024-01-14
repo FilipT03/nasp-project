@@ -61,3 +61,7 @@ func (hm *HashMap) Flush() []model.Record {
 func (hm *HashMap) Clear() {
 	hm.data = make(map[string]*model.Record)
 }
+
+func (hm *HashMap) IsFull() bool {
+	return len(hm.data) == int(hm.capacity)
+}

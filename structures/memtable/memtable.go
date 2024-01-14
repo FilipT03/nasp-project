@@ -7,7 +7,6 @@ import (
 	"nasp-project/structures/b_tree"
 	"nasp-project/structures/hash_map"
 	"nasp-project/structures/skip_list"
-	"nasp-project/structures/sstable"
 	"nasp-project/util"
 )
 
@@ -17,6 +16,7 @@ type memtableStructure interface {
 	Get(key []byte) (*model.Record, error)
 	Flush() []model.Record
 	Clear()
+	IsFull() bool
 }
 
 type Memtable struct {
@@ -70,19 +70,17 @@ func CreateMemtables(config *util.MemtableConfig) {
 }
 
 // Add a record to the structure. Automatically switches tables if the current one is full.
-// Flushes if all tables are full.
-func Add(record *model.Record) {
+// Returns an error if all tables are full.
+func Add(record *model.Record) error {
 	mt := Memtables.tables[Memtables.currentIndex]
-	err := mt.structure.Add(record)
-	if err != nil {
+	if mt.structure.IsFull() {
 		Memtables.currentIndex = (Memtables.currentIndex + 1) % Memtables.maxTables
 		if Memtables.currentIndex == Memtables.lastIndex {
-			flush()
-			Memtables.lastIndex = (Memtables.lastIndex + 1) % Memtables.maxTables
+			return errors.New("memtables full")
 		}
-
-		_ = Memtables.tables[Memtables.currentIndex].structure.Add(record)
+		mt = Memtables.tables[Memtables.currentIndex]
 	}
+	return mt.structure.Add(record)
 }
 
 // Clear deletes all memtables.
@@ -118,11 +116,16 @@ func Get(key []byte) (*model.Record, error) {
 	return nil, errors.New("error: key '" + string(key) + "' not found in " + util.GetConfig().Memtable.Structure)
 }
 
-func flush() {
+// IsFull returns true if all memtables are completely filled.
+func IsFull() bool {
+	return Memtables.tables[Memtables.currentIndex].structure.IsFull() &&
+		(Memtables.currentIndex+1)%Memtables.maxTables == Memtables.lastIndex
+}
+
+// Flush returns all records from the last memtable, clears the memtable and rotates accordingly.
+func Flush() []model.Record {
 	records := Memtables.tables[Memtables.lastIndex].structure.Flush()
-	_, err := sstable.CreateSSTable(records, util.GetConfig().SSTable)
-	if err != nil {
-		panic(err.Error())
-	}
 	Memtables.tables[Memtables.lastIndex].structure.Clear()
+	Memtables.lastIndex = (Memtables.lastIndex + 1) % Memtables.maxTables
+	return records
 }
