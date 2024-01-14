@@ -49,6 +49,7 @@ type SSTableConfig struct {
 type LSMTreeConfig struct {
 	MaxLevel            int    `yaml:"maxLevel"`
 	CompactionAlgorithm string `yaml:"compactionAlgorithm"`
+	MaxLsmNodesPerLevel int    `yaml:"maxLsmNodesPerLevel"`
 }
 
 type CacheConfig struct {
@@ -80,7 +81,8 @@ var config = &Config{
 		MerkleTreeChunkSize: 1024,
 	},
 	LSMTree: LSMTreeConfig{
-		MaxLevel: 4,
+		MaxLevel:            4,
+		MaxLsmNodesPerLevel: 8,
 	},
 	Cache: CacheConfig{
 		MaxSize: 1024,
