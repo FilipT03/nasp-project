@@ -23,8 +23,8 @@ func NewLRUCache(capacity uint64) LRUCache {
 }
 
 // Get returns *Data for specified key, or nil if absent
-func (LRU *LRUCache) Get(key []byte) *model.Record {
-	element := LRU.get(string(key))
+func (LRU *LRUCache) Get(key string) *model.Record {
+	element := LRU.get(key)
 	if element != nil {
 		return element.Value.(*model.Record)
 	}

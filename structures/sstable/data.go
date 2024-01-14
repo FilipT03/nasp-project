@@ -260,7 +260,6 @@ func (db *DataBlock) getRecordAtOffset(offset int64) (*DataRecord, error) {
 // GetRecordWithKeyFromOffset reads a record with the given key from the data block file, starting from the offset.
 // Returns nil if the record is not found.
 func (db *DataBlock) GetRecordWithKeyFromOffset(key []byte, offset int64) (*DataRecord, error) {
-	// TODO: Add CRC check
 	file, err := os.Open(db.Filename)
 	if err != nil {
 		return nil, err

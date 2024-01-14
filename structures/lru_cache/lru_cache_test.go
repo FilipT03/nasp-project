@@ -51,7 +51,7 @@ func TestLRUCache(t *testing.T) {
 	}
 	lruCache.Put(&rec4) // This should trigger eviction of rec1
 
-	element := lruCache.Get(key1)
+	element := lruCache.Get(string(key1))
 	if element != nil {
 		t.Errorf("Expected key %s to be evicted, but it's still in the cache.", key1)
 	}
@@ -65,7 +65,7 @@ func TestLRUCacheGetNonExistentKey(t *testing.T) {
 	lruCache := NewLRUCache(capacity)
 
 	// Test Get for a key that does not exist in the cache
-	key := []byte("nonexistent_key")
+	key := "nonexistent_key"
 	element := lruCache.Get(key)
 	if element != nil {
 		t.Errorf("Expected Get for a non-existent key to return nil, but it didn't.")
