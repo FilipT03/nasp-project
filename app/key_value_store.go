@@ -89,12 +89,15 @@ func (kvs *KeyValueStore) get(key string) ([]byte, error) {
 		return rec.Value, err
 	}
 
-	kvs.cache.Put(rec)
-
-	if rec.Tombstone {
-		return nil, nil
+	if rec != nil {
+		kvs.cache.Put(rec)
+		if rec.Tombstone {
+			return nil, nil
+		}
+		return rec.Value, nil
 	}
-	return rec.Value, nil
+
+	return nil, nil
 }
 
 // put saves a key-value pair to the database.
