@@ -6,18 +6,18 @@ import (
 	"os"
 )
 
-// TODO: Add support for size-tiered, leveled and token bucket algorithms
-
 type Config struct {
-	WAL      WALConfig      `yaml:"WAL"`
-	Memtable MemtableConfig `yaml:"Memtable"`
-	SSTable  SSTableConfig  `yaml:"SSTable"`
-	LSMTree  LSMTreeConfig  `yaml:"LMS"`
-	Cache    CacheConfig    `yaml:"Cache"`
+	WAL         WALConfig         `yaml:"WAL"`
+	Memtable    MemtableConfig    `yaml:"Memtable"`
+	SSTable     SSTableConfig     `yaml:"SSTable"`
+	LSMTree     LSMTreeConfig     `yaml:"LSMTree"`
+	Cache       CacheConfig       `yaml:"Cache"`
+	TokenBucket TokenBucketConfig `yaml:"TokenBucket"`
 }
 
 type WALConfig struct {
-	SegmentSize int `yaml:"segmentSize"`
+	SegmentSize uint64 `yaml:"segmentSize"`
+	BufferSize  uint32 `yaml:"bufferSize"`
 }
 
 type MemtableConfig struct {
@@ -53,12 +53,17 @@ type LSMTreeConfig struct {
 }
 
 type CacheConfig struct {
-	MaxSize int `yaml:"maxSize"`
+	MaxSize uint64 `yaml:"maxSize"`
+}
+
+type TokenBucketConfig struct {
+	MaxTokenSize int64 `yaml:"maxTokenSize"`
 }
 
 var config = &Config{
 	WAL: WALConfig{
 		SegmentSize: 512,
+		BufferSize:  128,
 	},
 	Memtable: MemtableConfig{
 		MaxSize:   1024,
@@ -82,10 +87,14 @@ var config = &Config{
 	},
 	LSMTree: LSMTreeConfig{
 		MaxLevel:            4,
+		CompactionAlgorithm: "Size-Tiered",
 		MaxLsmNodesPerLevel: 8,
 	},
 	Cache: CacheConfig{
 		MaxSize: 1024,
+	},
+	TokenBucket: TokenBucketConfig{
+		MaxTokenSize: 1024,
 	},
 }
 
