@@ -46,6 +46,11 @@ func Compact(sstableConfig *util.SSTableConfig, lsmConfig *util.LSMTreeConfig, m
 		// now I'm compressing
 		// while the number of SSTables is greater than the maximum number of nodes in the current level
 		for len(fileNames) >= maxLsmNodesPerLevel {
+			// if len(fileNames) == 1 then there is only one SSTable in the current level
+			// and no compaction is needed
+			if len(fileNames) == 1 {
+				break
+			}
 			// merge the first two SSTables from fileNames
 			sstable1, err := sstable.OpenSSTableFromToc(pathToToc + "/" + fileNames[0])
 			if err != nil {

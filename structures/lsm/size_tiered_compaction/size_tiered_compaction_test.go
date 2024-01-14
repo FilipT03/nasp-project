@@ -42,34 +42,31 @@ func TestCompact(t *testing.T) {
 	if err != nil {
 		fmt.Println(sstable3)
 	}
-	sstable4, err := sstable.CreateSSTable(recs, config)
-	if err != nil {
-		fmt.Println(sstable4)
-	}
+
 	lsmConfig := util.LSMTreeConfig{
 		MaxLevel: 3,
 	}
-	Compact(&config, &lsmConfig, 2)
+	Compact(&config, &lsmConfig, 1)
 	// Check if compaction has been performed correctly
 
 	// Example assertion: Check if the number of SSTables in the first level is as expected after compaction.
 	pathToToc := tmpDir + "/L001/TOC"
 	fileNames := FindSSTables(pathToToc)
-	expectedSSTables := 0
+	expectedSSTables := 1
 	if len(fileNames) != expectedSSTables {
 		t.Errorf("Expected %d SSTables after compaction, but got %d", expectedSSTables, len(fileNames))
 	}
 	// check the L002 level
 	pathToToc = tmpDir + "/L002/TOC"
 	fileNames = FindSSTables(pathToToc)
-	expectedSSTables = 0
+	expectedSSTables = 1
 	if len(fileNames) != expectedSSTables {
 		t.Errorf("Expected %d SSTables after compaction, but got %d", expectedSSTables, len(fileNames))
 	}
 	// check the L003 level
 	pathToToc = tmpDir + "/L003/TOC"
 	fileNames = FindSSTables(pathToToc)
-	expectedSSTables = 1
+	expectedSSTables = 0
 	if len(fileNames) != expectedSSTables {
 		t.Errorf("Expected %d SSTables after compaction, but got %d", expectedSSTables, len(fileNames))
 	}
