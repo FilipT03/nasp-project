@@ -20,8 +20,11 @@ func Read(key []byte, config *util.Config) (*model.Record, error) {
 		lvlLabel := fmt.Sprintf("L%03d", lvl)
 		path := filepath.Join(config.SSTable.SavePath, lvlLabel, "TOC")
 		folder, err := os.ReadDir(path)
-		if err != nil {
+		if err != nil && !os.IsNotExist(err) {
 			return nil, err
+		}
+		if os.IsNotExist(err) {
+			continue
 		}
 
 		var record *model.Record = nil
