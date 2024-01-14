@@ -23,4 +23,5 @@ LSMTree:
     maxLsmNodesPerLevel: 8
 Cache:
     maxSize: 1024
-
+TokenBucket:
+    MaxTokenSize: 1024

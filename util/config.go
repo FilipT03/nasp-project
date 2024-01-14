@@ -1,19 +1,19 @@
 package util
 
 import (
-	"gopkg.in/yaml.v3"
 	"log"
 	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
-// TODO: Add support for size-tiered, leveled and token bucket algorithms
-
 type Config struct {
-	WAL      WALConfig      `yaml:"WAL"`
-	Memtable MemtableConfig `yaml:"Memtable"`
-	SSTable  SSTableConfig  `yaml:"SSTable"`
-	LSMTree  LSMTreeConfig  `yaml:"LMS"`
-	Cache    CacheConfig    `yaml:"Cache"`
+	WAL         WALConfig         `yaml:"WAL"`
+	Memtable    MemtableConfig    `yaml:"Memtable"`
+	SSTable     SSTableConfig     `yaml:"SSTable"`
+	LSMTree     LSMTreeConfig     `yaml:"LSMTree"`
+	Cache       CacheConfig       `yaml:"Cache"`
+	TokenBucket TokenBucketConfig `yaml:"TokenBucket"`
 }
 
 type WALConfig struct {
@@ -55,7 +55,11 @@ type LSMTreeConfig struct {
 }
 
 type CacheConfig struct {
-	MaxSize int `yaml:"maxSize"`
+	MaxSize uint64 `yaml:"maxSize"`
+}
+
+type TokenBucketConfig struct {
+	MaxTokenSize int64 `yaml:"maxTokenSize"`
 }
 
 var config = &Config{
@@ -86,10 +90,14 @@ var config = &Config{
 	},
 	LSMTree: LSMTreeConfig{
 		MaxLevel:            4,
+		CompactionAlgorithm: "Size-Tiered",
 		MaxLsmNodesPerLevel: 8,
 	},
 	Cache: CacheConfig{
 		MaxSize: 1024,
+	},
+	TokenBucket: TokenBucketConfig{
+		MaxTokenSize: 1024,
 	},
 }
 
