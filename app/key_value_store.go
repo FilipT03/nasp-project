@@ -96,7 +96,7 @@ func (kvs *KeyValueStore) get(key string) ([]byte, error) {
 
 	rec, err = lsm.Read(keyBytes, kvs.config)
 	if err != nil {
-		return rec.Value, err
+		return nil, err
 	}
 
 	if rec != nil {
