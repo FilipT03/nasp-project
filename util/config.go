@@ -47,7 +47,7 @@ type SSTableConfig struct {
 }
 
 type LSMTreeConfig struct {
-	MaxLevel            int    `yaml:"maxLevel"`
+	MaxLevel            int    `yaml:"maxLevel" validate:"gte=1"`
 	CompactionAlgorithm string `yaml:"compactionAlgorithm" validate:"oneof=Size-Tiered Leveled"`
 	MaxLsmNodesPerLevel int    `yaml:"maxLsmNodesPerLevel" validate:"gte=1"`
 }
@@ -131,6 +131,7 @@ func SaveConfig(path string) {
 	}
 }
 
+// validateFloatBetween checks if a floating-point number is within the range (0, 1).
 func validateFloatBetween(fl validator.FieldLevel) bool {
 	minValue := 0.0
 	maxValue := 1.0
@@ -138,7 +139,7 @@ func validateFloatBetween(fl validator.FieldLevel) bool {
 	v := fl.Field()
 	if v.Kind() == reflect.Float64 {
 		value := v.Float()
-		return value >= minValue && value <= maxValue
+		return value > minValue && value < maxValue
 	}
 
 	return false

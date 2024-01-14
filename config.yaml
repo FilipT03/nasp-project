@@ -14,7 +14,7 @@ SSTable:
     summaryDegree: 5
     indexDegree: 5
     compression: false
-    filterPrecision: 2.32
+    filterPrecision: 0.01
     merkleTreeChunkSize: 1024
 LSMTree:
     maxLevel: 4
