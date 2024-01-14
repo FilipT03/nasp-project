@@ -4,12 +4,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/edsrzf/mmap-go"
 	"hash/crc32"
 	"nasp-project/util"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/edsrzf/mmap-go"
 )
 
 /*
@@ -84,7 +85,7 @@ func NewWAL(walConfig util.WALConfig, instances int) (*WAL, error) {
 
 	dirEntries, err := os.ReadDir(logsPath)
 	if os.IsNotExist(err) {
-		err := os.MkdirAll(logsPath, os.ModeDir)
+		err := os.Mkdir(logsPath, 0777)
 		if err != nil {
 			return nil, err
 		}

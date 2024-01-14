@@ -22,7 +22,7 @@ type SSTable struct {
 	MetadataFilename string
 }
 
-func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
+func initializeSSTable(level int, config *util.SSTableConfig) (*SSTable, error) {
 	path := filepath.Join(config.SavePath, fmt.Sprintf("L%03d", level))
 
 	labelNum, err := GetNextSStableLabel(filepath.Join(path, "TOC"))
@@ -104,7 +104,7 @@ func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
 }
 
 // CreateSSTable creates an SSTable from the given data records and writes it to disk.
-func CreateSSTable(records []model.Record, config util.SSTableConfig) (*SSTable, error) {
+func CreateSSTable(records []model.Record, config *util.SSTableConfig) (*SSTable, error) {
 	sstable, err := initializeSSTable(1, config) // when creating from memory, always save to the level no 1
 	if err != nil {
 		return nil, err

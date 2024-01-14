@@ -59,7 +59,7 @@ func Compact(sstableConfig *util.SSTableConfig, lsmConfig *util.LSMTreeConfig) {
 				return
 			}
 			// merge the two SSTables and save the result in the next level
-			_, err = sstable.MergeSSTables(sstable1, sstable2, level+1, *sstableConfig)
+			_, err = sstable.MergeSSTables(sstable1, sstable2, level+1, sstableConfig)
 			if err != nil {
 				return
 			}

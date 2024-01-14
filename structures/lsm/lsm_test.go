@@ -17,12 +17,13 @@ func TestRead(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sstConfig := util.SSTableConfig{
-		SavePath:        tmpDir,
-		SingleFile:      false,
-		IndexDegree:     2,
-		SummaryDegree:   3,
-		FilterPrecision: 0.01,
+	sstConfig := &util.SSTableConfig{
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
 	}
 
 	// Create some sample data records.
@@ -64,7 +65,7 @@ func TestRead(t *testing.T) {
 	}
 
 	config := &util.Config{
-		SSTable: sstConfig,
+		SSTable: *sstConfig,
 		LSMTree: util.LSMTreeConfig{
 			MaxLevel: 3,
 		},

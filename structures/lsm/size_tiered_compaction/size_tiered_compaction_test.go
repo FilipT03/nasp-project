@@ -14,14 +14,15 @@ func TestCompact(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temporary directory: %v", err)
 	}
-	// defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir)
 
-	config := util.SSTableConfig{
-		SavePath:        tmpDir,
-		SingleFile:      false,
-		IndexDegree:     2,
-		SummaryDegree:   3,
-		FilterPrecision: 0.01,
+	config := &util.SSTableConfig{
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
 	}
 
 	// Create some sample data records.
@@ -42,11 +43,15 @@ func TestCompact(t *testing.T) {
 	if err != nil {
 		fmt.Println(sstable3)
 	}
-
-	lsmConfig := util.LSMTreeConfig{
-		MaxLevel: 3,
+	sstable4, err := sstable.CreateSSTable(recs, config)
+	if err != nil {
+		fmt.Println(sstable4)
 	}
-	Compact(&config, &lsmConfig, 1)
+	lsmConfig := &util.LSMTreeConfig{
+		MaxLevel:            3,
+		MaxLsmNodesPerLevel: 2,
+	}
+	Compact(config, lsmConfig)
 	// Check if compaction has been performed correctly
 
 	// Example assertion: Check if the number of SSTables in the first level is as expected after compaction.

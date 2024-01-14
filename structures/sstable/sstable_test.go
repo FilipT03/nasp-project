@@ -17,7 +17,7 @@ func TestCreateSSTableSingleFile(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	config := util.SSTableConfig{
+	config := &util.SSTableConfig{
 		SavePath:            tmpDir,
 		SingleFile:          true,
 		IndexDegree:         2,
@@ -62,7 +62,7 @@ func TestCreateSSTableMultiFile(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	config := util.SSTableConfig{
+	config := &util.SSTableConfig{
 		SavePath:            tmpDir,
 		SingleFile:          false,
 		IndexDegree:         2,
@@ -125,7 +125,7 @@ func TestCreateSSTableSecond(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	config := util.SSTableConfig{
+	config := &util.SSTableConfig{
 		SavePath:            tmpDir,
 		SingleFile:          false,
 		IndexDegree:         2,
@@ -194,7 +194,7 @@ func TestOpenSSTableFromTOC(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	config := util.SSTableConfig{
+	config := &util.SSTableConfig{
 		SavePath:            tmpDir,
 		SingleFile:          false,
 		IndexDegree:         2,
@@ -259,7 +259,7 @@ func TestDeleteFiles(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	config := util.SSTableConfig{
+	config := &util.SSTableConfig{
 		SavePath:            tmpDir,
 		SingleFile:          false,
 		IndexDegree:         2,
@@ -325,7 +325,7 @@ func TestSSTable_Read(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	config := util.SSTableConfig{
+	config := &util.SSTableConfig{
 		SavePath:            tmpDir,
 		SingleFile:          false,
 		IndexDegree:         2,
@@ -370,7 +370,7 @@ func TestMergeSSTables(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	config := util.SSTableConfig{
+	config := &util.SSTableConfig{
 		SavePath:            tmpDir,
 		SingleFile:          false,
 		IndexDegree:         2,
@@ -449,7 +449,7 @@ func TestMergeSSTablesSameKey(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	config := util.SSTableConfig{
+	config := &util.SSTableConfig{
 		SavePath:            tmpDir,
 		SingleFile:          false,
 		IndexDegree:         2,
