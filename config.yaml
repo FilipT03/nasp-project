@@ -3,7 +3,7 @@ WAL:
     bufferSize: 128
 Memtable:
     maxSize: 1024
-    structure: SkipList
+    structure: SkipList # SkipList, HashMap, BTree
     instances: 1
     BTree:
         minSize: 16
@@ -15,7 +15,7 @@ SSTable:
     summaryDegree: 5
     indexDegree: 5
     compression: false
-    filterPrecision: 0.01
+    filterPrecision: 2.32
     merkleTreeChunkSize: 1024
 LSMTree:
     maxLevel: 4
