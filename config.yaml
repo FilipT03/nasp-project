@@ -24,4 +24,5 @@ LSMTree:
 Cache:
     maxSize: 1024
 TokenBucket:
-    MaxTokenSize: 1024
+    maxTokenSize: 1024
+    interval: 60
