@@ -5,6 +5,7 @@ import (
 	"errors"
 	"nasp-project/model"
 	"nasp-project/util"
+	"time"
 )
 
 type Node struct {
@@ -87,6 +88,8 @@ func (bt *BTree) Delete(key []byte) error {
 		return errors.New("error: could not delete key '" + string(key) + "' as it is already deleted")
 	}
 	nodeToInsert.records[index].Tombstone = true
+	nodeToInsert.records[index].Value = nil
+	nodeToInsert.records[index].Timestamp = uint64(time.Now().Unix())
 	return nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"nasp-project/model"
 	"sort"
+	"time"
 )
 
 type HashMap struct {
@@ -30,6 +31,8 @@ func (hm *HashMap) Delete(key []byte) error {
 		return err
 	}
 	record.Tombstone = true
+	record.Value = nil
+	record.Timestamp = uint64(time.Now().Unix())
 	return nil
 }
 
