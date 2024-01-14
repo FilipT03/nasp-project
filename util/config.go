@@ -1,10 +1,11 @@
 package util
 
 import (
+	"github.com/go-playground/validator/v10"
+	"gopkg.in/yaml.v3"
 	"log"
 	"os"
-
-	"gopkg.in/yaml.v3"
+	"reflect"
 )
 
 type Config struct {
@@ -18,40 +19,40 @@ type Config struct {
 
 type WALConfig struct {
 	SegmentSize   uint64 `yaml:"segmentSize"`
-	BufferSize    int    `yaml:"bufferSize"`
+	BufferSize    uint32 `yaml:"bufferSize"`
 	WALFolderPath string `yaml:"walFolderPath"`
 }
 
 type MemtableConfig struct {
-	MaxSize   int            `yaml:"maxSize"`
-	Structure string         `yaml:"structure"`
-	Instances int            `yaml:"instances"`
+	MaxSize   int            `yaml:"maxSize" validate:"gte=1"`
+	Structure string         `yaml:"structure" validate:"oneof=SkipList HashMap BTree"`
+	Instances int            `yaml:"instances" validate:"gte=1"`
 	SkipList  SkipListConfig `yaml:"SkipList"`
 	BTree     BTreeConfig    `yaml:"BTree"`
 }
 
 type BTreeConfig struct {
-	MinSize int `yaml:"minSize"`
+	MinSize int `yaml:"minSize" validate:"gte=1"`
 }
 
 type SkipListConfig struct {
-	MaxHeight int `yaml:"maxHeight"`
+	MaxHeight int `yaml:"maxHeight" validate:"gte=1"`
 }
 
 type SSTableConfig struct {
 	SavePath            string  `yaml:"savePath"`
 	SingleFile          bool    `yaml:"singleFile"`
-	SummaryDegree       int     `yaml:"summaryDegree"`
-	IndexDegree         int     `yaml:"indexDegree"`
+	SummaryDegree       int     `yaml:"summaryDegree" validate:"gte=1"`
+	IndexDegree         int     `yaml:"indexDegree" validate:"gte=1"`
 	Compression         bool    `yaml:"compression"`
-	FilterPrecision     float64 `yaml:"filterPrecision"`
-	MerkleTreeChunkSize int64   `yaml:"merkleTreeChunkSize"`
+	FilterPrecision     float64 `yaml:"filterPrecision" validate:"float_between"`
+	MerkleTreeChunkSize int64   `yaml:"merkleTreeChunkSize" validate:"gte=1"`
 }
 
 type LSMTreeConfig struct {
 	MaxLevel            int    `yaml:"maxLevel"`
-	CompactionAlgorithm string `yaml:"compactionAlgorithm"`
-	MaxLsmNodesPerLevel int    `yaml:"maxLsmNodesPerLevel"`
+	CompactionAlgorithm string `yaml:"compactionAlgorithm" validate:"oneof=Size-Tiered Leveled"`
+	MaxLsmNodesPerLevel int    `yaml:"maxLsmNodesPerLevel" validate:"gte=1"`
 }
 
 type CacheConfig struct {
@@ -59,7 +60,7 @@ type CacheConfig struct {
 }
 
 type TokenBucketConfig struct {
-	MaxTokenSize int64 `yaml:"maxTokenSize"`
+	MaxTokenSize int64 `yaml:"maxTokenSize" validate:"gte=1"`
 	Interval     int64 `yaml:"interval"`
 }
 
@@ -112,10 +113,22 @@ func GetConfig() *Config {
 func LoadConfig(path string) *Config {
 	file, err := os.ReadFile(path)
 	if err != nil {
+		log.Println("warning: The configuration file is invalid. Using the default configuration.")
 		return config
 	}
+	loadedConfig := Config{}
+	_ = yaml.Unmarshal(file, &loadedConfig)
 
-	_ = yaml.Unmarshal(file, &config)
+	validate := validator.New(validator.WithRequiredStructEnabled())
+	_ = validate.RegisterValidation("float_between", validateFloatBetween)
+	err = validate.Struct(loadedConfig)
+
+	if err != nil {
+		log.Println("warning: The configuration file is invalid. Using the default configuration.")
+	} else {
+		config = &loadedConfig
+	}
+
 	return config
 }
 
@@ -130,4 +143,17 @@ func SaveConfig(path string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func validateFloatBetween(fl validator.FieldLevel) bool {
+	minValue := 0.0
+	maxValue := 1.0
+
+	v := fl.Field()
+	if v.Kind() == reflect.Float64 {
+		value := v.Float()
+		return value >= minValue && value <= maxValue
+	}
+
+	return false
 }
