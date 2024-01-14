@@ -169,8 +169,26 @@ func (db *DataBlock) writeRecord(file *os.File, rec *DataRecord) error {
 	return nil
 }
 
+// isEndOfBlock return true if file pointer is positioned at the end of the given data block.
+func (db *DataBlock) isEndOfBlock(file *os.File) (bool, error) {
+	pos, err := file.Seek(0, 1)
+	if err != nil {
+		return false, err
+	}
+	return pos == db.StartOffset+db.Size, nil
+}
+
 // getNextRecord assumes the provided file is at the start of the record and reads the next record.
-func getNextRecord(file *os.File) (*DataRecord, error) {
+// Returns nil if positioned at the end of data block.
+func (db *DataBlock) getNextRecord(file *os.File) (*DataRecord, error) {
+	end, err := db.isEndOfBlock(file)
+	if err != nil {
+		return nil, err
+	}
+	if end {
+		return nil, nil
+	}
+
 	bytes := make([]byte, 4)
 	rl, err := file.Read(bytes)
 	if rl != 4 {
@@ -254,7 +272,7 @@ func (db *DataBlock) getRecordAtOffset(offset int64) (*DataRecord, error) {
 		return nil, err
 	}
 
-	return getNextRecord(file)
+	return db.getNextRecord(file)
 }
 
 // GetRecordWithKeyFromOffset reads a record with the given key from the data block file, starting from the offset.
@@ -316,11 +334,11 @@ func (db *DataBlock) WriteMerged(db1, db2 *DataBlock) (uint, error) {
 	}
 	defer file2.Close()
 
-	rec1, err := getNextRecord(file1)
+	rec1, err := db1.getNextRecord(file1)
 	if err != nil {
 		return 0, err
 	}
-	rec2, err := getNextRecord(file2)
+	rec2, err := db2.getNextRecord(file2)
 	if err != nil {
 		return 0, err
 	}
@@ -334,7 +352,7 @@ func (db *DataBlock) WriteMerged(db1, db2 *DataBlock) (uint, error) {
 			if err != nil {
 				return cnt, err
 			}
-			rec2, err = getNextRecord(file2)
+			rec2, err = db2.getNextRecord(file2)
 			if err != nil {
 				return cnt, err
 			}
@@ -343,7 +361,7 @@ func (db *DataBlock) WriteMerged(db1, db2 *DataBlock) (uint, error) {
 			if err != nil {
 				return cnt, err
 			}
-			rec1, err = getNextRecord(file1)
+			rec1, err = db1.getNextRecord(file1)
 			if err != nil {
 				return cnt, err
 			}
@@ -354,7 +372,7 @@ func (db *DataBlock) WriteMerged(db1, db2 *DataBlock) (uint, error) {
 				if err != nil {
 					return cnt, err
 				}
-				rec1, err = getNextRecord(file1)
+				rec1, err = db1.getNextRecord(file1)
 				if err != nil {
 					return cnt, err
 				}
@@ -363,7 +381,7 @@ func (db *DataBlock) WriteMerged(db1, db2 *DataBlock) (uint, error) {
 				if err != nil {
 					return cnt, err
 				}
-				rec2, err = getNextRecord(file2)
+				rec2, err = db2.getNextRecord(file2)
 				if err != nil {
 					return cnt, err
 				}
@@ -372,11 +390,11 @@ func (db *DataBlock) WriteMerged(db1, db2 *DataBlock) (uint, error) {
 				if err != nil {
 					return cnt, err
 				}
-				rec1, err = getNextRecord(file1)
+				rec1, err = db1.getNextRecord(file1)
 				if err != nil {
 					return cnt, err
 				}
-				rec2, err = getNextRecord(file2)
+				rec2, err = db2.getNextRecord(file2)
 				if err != nil {
 					return cnt, err
 				}
@@ -385,11 +403,11 @@ func (db *DataBlock) WriteMerged(db1, db2 *DataBlock) (uint, error) {
 				if err != nil {
 					return cnt, err
 				}
-				rec1, err = getNextRecord(file1)
+				rec1, err = db1.getNextRecord(file1)
 				if err != nil {
 					return cnt, err
 				}
-				rec2, err = getNextRecord(file2)
+				rec2, err = db2.getNextRecord(file2)
 				if err != nil {
 					return cnt, err
 				}
