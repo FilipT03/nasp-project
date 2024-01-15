@@ -7,8 +7,8 @@ import (
 
 const SimHashPrefix = "SH_"
 
-// NewSH calculates fingerprint of the given text and stores it in the database with the specified key.
-func (kvs *KeyValueStore) NewSH(key string, text string) error {
+// SHAddFingerprint calculates fingerprint of the given text and stores it in the database with the specified key.
+func (kvs *KeyValueStore) SHAddFingerprint(key string, text string) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
@@ -21,8 +21,8 @@ func (kvs *KeyValueStore) NewSH(key string, text string) error {
 	return kvs.put(key, shFingerprint.Serialize())
 }
 
-// DeleteSH deletes a sim hash record with the specified key.
-func (kvs *KeyValueStore) DeleteSH(key string) error {
+// SHDeleteFingerprint deletes a sim hash record with the specified key.
+func (kvs *KeyValueStore) SHDeleteFingerprint(key string) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
@@ -30,8 +30,8 @@ func (kvs *KeyValueStore) DeleteSH(key string) error {
 	return kvs.delete(key)
 }
 
-// GetHammingDistance calculates the hamming distance between two sim hash records with the specified keys.
-func (kvs *KeyValueStore) GetHammingDistance(key1 string, key2 string) (uint8, error) {
+// SHGetHammingDistance calculates the hamming distance between two sim hash records with the specified keys.
+func (kvs *KeyValueStore) SHGetHammingDistance(key1 string, key2 string) (uint8, error) {
 	if kvs.rateLimitReached() {
 		return 0, errors.New("rate limit reached")
 	}
