@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"nasp-project/model"
 	"strings"
+	"time"
 )
 
 type skipListNode struct {
@@ -195,6 +196,8 @@ func (sl *SkipList) Delete(key []byte) error {
 		return err
 	}
 	node.Tombstone = true
+	node.Value = nil
+	node.Timestamp = uint64(time.Now().Unix())
 	return nil
 }
 
@@ -255,4 +258,8 @@ func (sl *SkipList) searchForKey(key string) *skipListNode {
 		}
 	}
 	return currentNode
+}
+
+func (sl *SkipList) IsFull() bool {
+	return sl.size == sl.maxSize
 }

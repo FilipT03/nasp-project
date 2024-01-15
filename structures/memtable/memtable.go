@@ -7,7 +7,6 @@ import (
 	"nasp-project/structures/b_tree"
 	"nasp-project/structures/hash_map"
 	"nasp-project/structures/skip_list"
-	"nasp-project/structures/sstable"
 	"nasp-project/util"
 )
 
@@ -17,44 +16,47 @@ type memtableStructure interface {
 	Get(key []byte) (*model.Record, error)
 	Flush() []model.Record
 	Clear()
+	IsFull() bool
 }
 
 type Memtable struct {
 	structure memtableStructure
 }
 
-var Memtables = struct {
+type Memtables struct {
 	currentIndex int
 	lastIndex    int
 	maxTables    int
 	tables       []*Memtable
-}{currentIndex: 0, lastIndex: 0, maxTables: 0, tables: nil}
+}
 
 // CreateMemtables creates instances of Memtable.
 // If the structure is invalid, it creates a Skip List.
-func CreateMemtables(config *util.MemtableConfig) {
+func CreateMemtables(config *util.MemtableConfig) *Memtables {
 	structure := config.Structure
 	instances := config.Instances
 
-	Memtables.tables = make([]*Memtable, 0)
-	Memtables.maxTables = instances
+	memts := &Memtables{}
+
+	memts.tables = make([]*Memtable, 0)
+	memts.maxTables = instances
 
 	switch structure {
 	case "BTree":
 		for i := 0; i < instances; i++ {
-			Memtables.tables = append(Memtables.tables, &Memtable{
+			memts.tables = append(memts.tables, &Memtable{
 				structure: b_tree.NewBTree(config.BTree.MinSize),
 			})
 		}
 	case "SkipList":
 		for i := 0; i < instances; i++ {
-			Memtables.tables = append(Memtables.tables, &Memtable{
+			memts.tables = append(memts.tables, &Memtable{
 				structure: skip_list.NewSkipList(uint32(config.MaxSize), uint32(config.SkipList.MaxHeight)),
 			})
 		}
 	case "HashMap":
 		for i := 0; i < instances; i++ {
-			Memtables.tables = append(Memtables.tables, &Memtable{
+			memts.tables = append(memts.tables, &Memtable{
 				structure: hash_map.NewHashMap(uint32(config.MaxSize)),
 			})
 		}
@@ -62,67 +64,70 @@ func CreateMemtables(config *util.MemtableConfig) {
 		log.Print("warning: The memtable structure is invalid. The default structure (SkipList) will be used.")
 		structure = "SkipList"
 		for i := 0; i < instances; i++ {
-			Memtables.tables = append(Memtables.tables, &Memtable{
+			memts.tables = append(memts.tables, &Memtable{
 				structure: skip_list.NewSkipList(uint32(config.MaxSize), uint32(config.SkipList.MaxHeight)),
 			})
 		}
 	}
+
+	return memts
 }
 
 // Add a record to the structure. Automatically switches tables if the current one is full.
-// Flushes if all tables are full.
-func Add(record *model.Record) {
-	mt := Memtables.tables[Memtables.currentIndex]
-	err := mt.structure.Add(record)
-	if err != nil {
-		Memtables.currentIndex = (Memtables.currentIndex + 1) % Memtables.maxTables
-		if Memtables.currentIndex == Memtables.lastIndex {
-			flush()
-			Memtables.lastIndex = (Memtables.lastIndex + 1) % Memtables.maxTables
+// Returns an error if all tables are full.
+func (mts *Memtables) Add(record *model.Record) error {
+	mt := mts.tables[mts.currentIndex]
+	if mt.structure.IsFull() {
+		mts.currentIndex = (mts.currentIndex + 1) % mts.maxTables
+		if mts.currentIndex == mts.lastIndex {
+			return errors.New("memtables full")
 		}
-
-		_ = Memtables.tables[Memtables.currentIndex].structure.Add(record)
+		mt = mts.tables[mts.currentIndex]
 	}
+	return mt.structure.Add(record)
 }
 
 // Clear deletes all memtables.
-func Clear() {
-	for _, table := range Memtables.tables {
+func (mts *Memtables) Clear() {
+	for _, table := range mts.tables {
 		table.structure.Clear()
 	}
-
-	Memtables.currentIndex = 0
-	Memtables.lastIndex = 0
-	Memtables.maxTables = 0
-	Memtables.tables = nil
+	mts.currentIndex = 0
+	mts.lastIndex = 0
+	mts.maxTables = 0
+	mts.tables = nil
 }
 
 // Delete record from structure. Returns error if key does not exist.
-func Delete(key []byte) error {
-	return Memtables.tables[Memtables.currentIndex].structure.Delete(key)
+func (mts *Memtables) Delete(key []byte) error {
+	return mts.tables[mts.currentIndex].structure.Delete(key)
 }
 
 // Get key from structure. Return error if key does not exist.
-func Get(key []byte) (*model.Record, error) {
-	index := Memtables.currentIndex
+func (mts *Memtables) Get(key []byte) (*model.Record, error) {
+	index := mts.currentIndex
 	for {
-		record, err := Memtables.tables[index].structure.Get(key)
+		record, err := mts.tables[index].structure.Get(key)
 		if err == nil {
 			return record, nil
 		}
-		index = (index - 1) % Memtables.maxTables
-		if index == Memtables.currentIndex {
+		index = (index - 1) % mts.maxTables
+		if index == mts.currentIndex {
 			break
 		}
 	}
 	return nil, errors.New("error: key '" + string(key) + "' not found in " + util.GetConfig().Memtable.Structure)
 }
 
-func flush() {
-	records := Memtables.tables[Memtables.lastIndex].structure.Flush()
-	_, err := sstable.CreateSSTable(records, util.GetConfig().SSTable)
-	if err != nil {
-		panic(err.Error())
-	}
-	Memtables.tables[Memtables.lastIndex].structure.Clear()
+// IsFull returns true if all memtables are completely filled.
+func (mts *Memtables) IsFull() bool {
+	return mts.tables[mts.currentIndex].structure.IsFull() && (mts.currentIndex+1)%mts.maxTables == mts.lastIndex
+}
+
+// Flush returns all records from the last memtable, clears the memtable and rotates accordingly.
+func (mts *Memtables) Flush() []model.Record {
+	records := mts.tables[mts.lastIndex].structure.Flush()
+	mts.tables[mts.lastIndex].structure.Clear()
+	mts.lastIndex = (mts.lastIndex + 1) % mts.maxTables
+	return records
 }

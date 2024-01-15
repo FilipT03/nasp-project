@@ -1,5 +1,6 @@
 WAL:
     segmentSize: 512
+    bufferSize: 128
 Memtable:
     maxSize: 1024
     structure: SkipList
@@ -22,4 +23,6 @@ LSMTree:
     maxLsmNodesPerLevel: 8
 Cache:
     maxSize: 1024
-
+TokenBucket:
+    maxTokenSize: 1024
+    interval: 60

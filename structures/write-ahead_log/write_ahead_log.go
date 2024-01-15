@@ -71,7 +71,7 @@ type WAL struct {
 func NewWAL(bufferSize uint32, segmentSize uint64) (*WAL, error) {
 	dirEntries, err := os.ReadDir(WALPath)
 	if os.IsNotExist(err) {
-		err := os.Mkdir(WALPath, os.ModeDir)
+		err := os.Mkdir(WALPath, 0777)
 		if err != nil {
 			return nil, err
 		}

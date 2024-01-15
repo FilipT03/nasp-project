@@ -21,7 +21,7 @@ type SSTable struct {
 	MetadataFilename string
 }
 
-func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
+func initializeSSTable(level int, config *util.SSTableConfig) (*SSTable, error) {
 	path := filepath.Join(config.SavePath, fmt.Sprintf("L%03d", level))
 
 	label, err := getNextSStableLabel(filepath.Join(path, "TOC"))
@@ -102,7 +102,7 @@ func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
 }
 
 // CreateSSTable creates an SSTable from the given data records and writes it to disk.
-func CreateSSTable(records []model.Record, config util.SSTableConfig) (*SSTable, error) {
+func CreateSSTable(records []model.Record, config *util.SSTableConfig) (*SSTable, error) {
 	sstable, err := initializeSSTable(1, config) // when creating from memory, always save to the level no 1
 	if err != nil {
 		return nil, err
@@ -484,7 +484,7 @@ func (sst *SSTable) Read(key []byte) (*model.Record, error) {
 // Removes the input SSTables from disk.
 // Returns the new SSTable.
 // Returns an error if the merge fails.
-func MergeSSTables(sst1, sst2 *SSTable, level int, config util.SSTableConfig) (*SSTable, error) {
+func MergeSSTables(sst1, sst2 *SSTable, level int, config *util.SSTableConfig) (*SSTable, error) {
 	sstable, err := initializeSSTable(level, config)
 	if err != nil {
 		return nil, err
