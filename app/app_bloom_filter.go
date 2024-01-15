@@ -71,7 +71,6 @@ func (kvs *KeyValueStore) BFHasKey(key string, val []byte) (bool, error) {
 	}
 
 	bf := bloom_filter.Deserialize(bfBytes)
-	ans := bf.HasKey(val)
 
-	return ans, kvs.put(key, bf.Serialize())
+	return bf.HasKey(val), nil
 }
