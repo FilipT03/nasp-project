@@ -7,6 +7,10 @@ import (
 
 const BloomFilterPrefix = "BF_"
 
+// NewBF creates a new bloom filter record with specified key.
+// Size of the bitset and number of hash functions calculated based on
+// the expected number of elements (n) and desired false-positive probability (p).
+// Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) NewBF(key string, n uint, p float64) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
@@ -16,6 +20,8 @@ func (kvs *KeyValueStore) NewBF(key string, n uint, p float64) error {
 	return kvs.put(key, bf.Serialize())
 }
 
+// DeleteBF deletes a bloom filter record with the specified key.
+// Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) DeleteBF(key string) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
@@ -24,6 +30,9 @@ func (kvs *KeyValueStore) DeleteBF(key string) error {
 	return kvs.delete(key)
 }
 
+// BFAdd performs Add(val) operation on a bloom filter record with the specified key.
+// Returns an error if no bloom filter record with the given key exists.
+// Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) BFAdd(key string, val []byte) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
@@ -44,6 +53,9 @@ func (kvs *KeyValueStore) BFAdd(key string, val []byte) error {
 	return kvs.put(key, bf.Serialize())
 }
 
+// BFHasKey performs HasKey(val) operation on a bloom filter record with the specified key.
+// Returns an error if no bloom filter record with the given key exists.
+// Returns an error if the read fails or the rate limit is reached.
 func (kvs *KeyValueStore) BFHasKey(key string, val []byte) (bool, error) {
 	if kvs.rateLimitReached() {
 		return false, errors.New("rate limit reached")
