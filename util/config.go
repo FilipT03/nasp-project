@@ -9,7 +9,6 @@ import (
 )
 
 type Config struct {
-<<<<<<< HEAD
 	WAL         WALConfig         `yaml:"WAL"`
 	Memtable    MemtableConfig    `yaml:"Memtable"`
 	SSTable     SSTableConfig     `yaml:"SSTable"`
@@ -19,19 +18,8 @@ type Config struct {
 }
 
 type WALConfig struct {
-	SegmentSize uint64 `yaml:"segmentSize"`
-	BufferSize  uint32 `yaml:"bufferSize"`
-=======
-	WAL      WALConfig      `yaml:"WAL"`
-	Memtable MemtableConfig `yaml:"Memtable"`
-	SSTable  SSTableConfig  `yaml:"SSTable"`
-	LSMTree  LSMTreeConfig  `yaml:"LSMTree"`
-	Cache    CacheConfig    `yaml:"Cache"`
-}
-
-type WALConfig struct {
-	SegmentSize int `yaml:"segmentSize" validate:"gte=1"`
->>>>>>> 95b42d5 ([config-validator] Add validation)
+	SegmentSize int    `yaml:"segmentSize" validate:"gte=1"`
+	BufferSize  uint32 `yaml:"bufferSize" validate:"gte=1"`
 }
 
 type MemtableConfig struct {
@@ -67,16 +55,12 @@ type LSMTreeConfig struct {
 }
 
 type CacheConfig struct {
-<<<<<<< HEAD
-	MaxSize uint64 `yaml:"maxSize"`
+	MaxSize uint64 `yaml:"maxSize" validate:"gte=1"`
 }
 
 type TokenBucketConfig struct {
-	MaxTokenSize int64 `yaml:"maxTokenSize"`
-	Interval     int64 `yaml:"interval"`
-=======
-	MaxSize int `yaml:"maxSize" validate:"gte=1"`
->>>>>>> 95b42d5 ([config-validator] Add validation)
+	MaxTokenSize int64 `yaml:"maxTokenSize" validate:"gte=1"`
+	Interval     int64 `yaml:"interval" validate:"gte=1"`
 }
 
 var config = &Config{
