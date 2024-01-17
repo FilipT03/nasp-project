@@ -1,11 +1,12 @@
 package util
 
 import (
-	"github.com/go-playground/validator/v10"
-	"gopkg.in/yaml.v3"
 	"log"
 	"os"
 	"reflect"
+
+	"github.com/go-playground/validator/v10"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
@@ -18,8 +19,8 @@ type Config struct {
 }
 
 type WALConfig struct {
-	SegmentSize   uint64 `yaml:"segmentSize"`
-	BufferSize    uint32 `yaml:"bufferSize"`
+	SegmentSize   uint64 `yaml:"segmentSize" validate:"gte=1"`
+	BufferSize    int    `yaml:"bufferSize" validate:"gte=1"`
 	WALFolderPath string `yaml:"walFolderPath"`
 }
 
@@ -56,12 +57,12 @@ type LSMTreeConfig struct {
 }
 
 type CacheConfig struct {
-	MaxSize uint64 `yaml:"maxSize"`
+	MaxSize uint64 `yaml:"maxSize" validate:"gte=1"`
 }
 
 type TokenBucketConfig struct {
 	MaxTokenSize int64 `yaml:"maxTokenSize" validate:"gte=1"`
-	Interval     int64 `yaml:"interval"`
+	Interval     int64 `yaml:"interval" validate:"gte=1"`
 }
 
 var config = &Config{
