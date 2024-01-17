@@ -61,7 +61,6 @@ type CacheConfig struct {
 type TokenBucketConfig struct {
 	MaxTokenSize int64 `yaml:"maxTokenSize" validate:"gte=1"`
 	Interval     int64 `yaml:"interval" validate:"gte=1"`
-	MaxSize      int   `yaml:"maxSize" validate:"gte=1"`
 }
 
 var config = &Config{
