@@ -18,7 +18,7 @@ type Config struct {
 }
 
 type WALConfig struct {
-	SegmentSize int    `yaml:"segmentSize" validate:"gte=1"`
+	SegmentSize uint64 `yaml:"segmentSize" validate:"gte=1"`
 	BufferSize  uint32 `yaml:"bufferSize" validate:"gte=1"`
 }
 
