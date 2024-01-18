@@ -1,7 +1,6 @@
 package sstable
 
 import (
-	"encoding/binary"
 	"nasp-project/structures/bloom_filter"
 	"nasp-project/util"
 	"os"
@@ -46,6 +45,7 @@ func (fb *FilterBlock) CreateFilter(keys [][]byte, p float64) {
 	}
 }
 
+// CreateFromDataBlock creates a filter from a given DataBlock by adding the key of each record.
 func (fb *FilterBlock) CreateFromDataBlock(n uint, p float64, db *DataBlock) error {
 	fb.Filter = bloom_filter.NewBloomFilter(n, p)
 
@@ -61,44 +61,36 @@ func (fb *FilterBlock) CreateFromDataBlock(n uint, p float64, db *DataBlock) err
 	}
 
 	for {
-		offset, err := file.Seek(12, 1)
+		offset, err := file.Seek(4, 1) // skip CRC
 		if err != nil {
 			return err
 		}
-		if offset >= db.Size {
+		if offset >= db.StartOffset+db.Size {
 			break
+		}
+
+		_, err = util.ReadUvarint(file) // skip timestamp
+		if err != nil {
+			return err
 		}
 
 		tombstone := make([]byte, 1)
 		rl, err := file.Read(tombstone)
-		if rl != 1 {
-			break
-		}
 		if err != nil {
 			return err
 		}
 
-		keySizeBytes := make([]byte, 8)
-		rl, err = file.Read(keySizeBytes)
-		if rl != 8 {
-			break
-		}
+		keySize, err := util.ReadUvarint(file)
 		if err != nil {
 			return err
 		}
-		keySize := binary.LittleEndian.Uint64(keySizeBytes)
 
 		var valueSize uint64 = 0
 		if tombstone[0] == 0 {
-			valueSizeBytes := make([]byte, 8)
-			rl, err = file.Read(valueSizeBytes)
-			if rl != 8 {
-				break
-			}
+			valueSize, err = util.ReadUvarint(file)
 			if err != nil {
 				return err
 			}
-			valueSize = binary.LittleEndian.Uint64(valueSizeBytes)
 		}
 
 		key := make([]byte, keySize)
