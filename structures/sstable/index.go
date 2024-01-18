@@ -29,6 +29,11 @@ type IndexBlock struct {
 	util.BinaryFile // Only file block because nothing is ever loaded into memory
 }
 
+func (ir *IndexRecord) sizeOnDisk() int {
+	buf := make([]byte, binary.MaxVarintLen64)
+	return binary.PutUvarint(buf, uint64(len(ir.Key))) + len(ir.Key) + binary.PutUvarint(buf, uint64(ir.Offset))
+}
+
 // CreateFromDataBlock creates an index block from the given data block and writes it to disk.
 // It also sets the size of the index block.
 // sparseDeg is the number of records to skip before adding the next record.
@@ -57,13 +62,20 @@ func (ib *IndexBlock) CreateFromDataBlock(sparseDeg int, db *DataBlock) error {
 	}
 
 	for cnt := 0; ; cnt++ {
-		offset, err := dbFile.Seek(12, 1)
+		var recSize int64 = 4
+		offset, err := dbFile.Seek(4, 1) // skip CRC
 		if err != nil {
 			return err
 		}
-		if offset >= db.Size {
+		if offset >= db.StartOffset+db.Size {
 			break
 		}
+
+		_, n, err := util.ReadUvarintLen(dbFile) // skip timestamp
+		if err != nil {
+			return err
+		}
+		recSize += int64(n)
 
 		tombstone := make([]byte, 1)
 		rl, err := dbFile.Read(tombstone)
@@ -73,28 +85,21 @@ func (ib *IndexBlock) CreateFromDataBlock(sparseDeg int, db *DataBlock) error {
 		if err != nil {
 			return err
 		}
+		recSize += 1
 
-		keySizeBytes := make([]byte, 8)
-		rl, err = dbFile.Read(keySizeBytes)
-		if rl != 8 {
-			break
-		}
+		keySize, n, err := util.ReadUvarintLen(dbFile)
 		if err != nil {
 			return err
 		}
-		keySize := binary.LittleEndian.Uint64(keySizeBytes)
+		recSize += int64(n)
 
 		var valueSize uint64 = 0
 		if tombstone[0] == 0 {
-			valueSizeBytes := make([]byte, 8)
-			rl, err = dbFile.Read(valueSizeBytes)
-			if rl != 8 {
-				break
-			}
+			valueSize, n, err = util.ReadUvarintLen(dbFile)
 			if err != nil {
 				return err
 			}
-			valueSize = binary.LittleEndian.Uint64(valueSizeBytes)
+			recSize += int64(n)
 		}
 
 		key := make([]byte, keySize)
@@ -105,20 +110,19 @@ func (ib *IndexBlock) CreateFromDataBlock(sparseDeg int, db *DataBlock) error {
 		if err != nil {
 			return err
 		}
+		recSize += int64(keySize)
 
 		offset, err = dbFile.Seek(int64(valueSize), 1)
 		if err != nil {
 			return err
 		}
+		recSize += int64(valueSize)
+
+		offset -= db.StartOffset
 		last := offset >= db.Size // whether this is the last record
 
-		offset -= 21 + int64(len(key)) + int64(valueSize) // offset of the start of the record
-		if tombstone[0] == 0 {
-			offset -= 8 // value size field is not present if the record is a tombstone
-		}
-		offset -= db.StartOffset // offset of the start of the record relative to the start of the data block
-
 		if cnt%sparseDeg == 0 || last { // add every sparseDeg-th record and the last record
+			offset -= recSize
 			err = ib.writeRecord(file, IndexRecord{key, offset})
 			if err != nil {
 				return err
@@ -127,6 +131,9 @@ func (ib *IndexBlock) CreateFromDataBlock(sparseDeg int, db *DataBlock) error {
 	}
 
 	ib.Size, err = file.Seek(0, 1)
+	if err != nil {
+		return err
+	}
 	ib.Size -= ib.StartOffset
 	return nil
 }
@@ -159,11 +166,7 @@ func (ib *IndexBlock) CreateFromDataRecords(sparseDeg int, recs []DataRecord) ([
 			}
 			idxRecs = append(idxRecs, ir)
 		}
-		if rec.Tombstone {
-			offset += 21 + int64(len(rec.Key))
-		} else {
-			offset += 29 + int64(len(rec.Key)) + int64(len(rec.Value))
-		}
+		offset += int64(rec.sizeOnDisk())
 	}
 
 	ib.Size, err = file.Seek(0, 1)
@@ -176,9 +179,7 @@ func (ib *IndexBlock) CreateFromDataRecords(sparseDeg int, recs []DataRecord) ([
 
 // writeRecord write a single IndexRecord to the given file.
 func (ib *IndexBlock) writeRecord(file *os.File, ir IndexRecord) error {
-	keySize := make([]byte, 8)
-	binary.LittleEndian.PutUint64(keySize, uint64(len(ir.Key)))
-	_, err := file.Write(keySize)
+	err := util.WriteUvarint(file, uint64(len(ir.Key)))
 	if err != nil {
 		return err
 	}
@@ -188,9 +189,7 @@ func (ib *IndexBlock) writeRecord(file *os.File, ir IndexRecord) error {
 		return err
 	}
 
-	offsetBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(offsetBytes, uint64(ir.Offset))
-	_, err = file.Write(offsetBytes)
+	err = util.WriteUvarint(file, uint64(ir.Offset))
 	if err != nil {
 		return err
 	}
@@ -205,12 +204,10 @@ func (ib *IndexBlock) getRecordAtOffset(file *os.File, offset int64) (*IndexReco
 		return nil, err
 	}
 
-	keySizeBytes := make([]byte, 8)
-	_, err = file.Read(keySizeBytes)
+	keySize, err := util.ReadUvarint(file)
 	if err != nil {
 		return nil, err
 	}
-	keySize := binary.LittleEndian.Uint64(keySizeBytes)
 
 	key := make([]byte, keySize)
 	_, err = file.Read(key)
@@ -218,14 +215,12 @@ func (ib *IndexBlock) getRecordAtOffset(file *os.File, offset int64) (*IndexReco
 		return nil, err
 	}
 
-	offsetBytes := make([]byte, 8)
-	_, err = file.Read(offsetBytes)
+	irOffset, err := util.ReadUvarint(file)
 	if err != nil {
 		return nil, err
 	}
-	offset = int64(binary.LittleEndian.Uint64(offsetBytes))
 
-	return &IndexRecord{key, offset}, nil
+	return &IndexRecord{key, int64(irOffset)}, nil
 }
 
 // GetRecordWithKeyFromOffset returns the IndexRecord with the largest key that is less than or
@@ -256,7 +251,7 @@ func (ib *IndexBlock) GetRecordWithKeyFromOffset(key []byte, offset int64) (*Ind
 		} else {
 			return lastFoundRecord, nil
 		}
-		offset += 16 + int64(len(idxRec.Key)) // offset of the next record
+		offset += int64(idxRec.sizeOnDisk()) // offset of the next record
 		if offset >= ib.Size {
 			return lastFoundRecord, nil
 		}

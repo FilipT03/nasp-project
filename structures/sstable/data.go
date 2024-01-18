@@ -12,9 +12,9 @@ import (
 /*
 	=== DATA RECORD ===
 
-	+---------------+-----------------+---------------+---------------+-----------------+-...-+--...--+
-	|    CRC (4B)   | Timestamp (8B)  | Tombstone(1B) | Key Size (8B) | Value Size (8B) | Key | Value |
-	+---------------+-----------------+---------------+---------------+-----------------+-...-+--...--+
+	+---------------+------------------+---------------+----------------+------------------+-...-+--...--+
+	|    CRC (4B)   | Timestamp (VAR)  | Tombstone(1B) | Key Size (VAR) | Value Size (VAR) | Key | Value |
+	+---------------+------------------+---------------+----------------+------------------+-...-+--...--+
 	CRC = 32bit hash computed over the payload using CRC
 	Timestamp = Timestamp of the operation in seconds
 	Tombstone = If this record was deleted
@@ -24,6 +24,7 @@ import (
 	Value = Value data (only if Tombstone is 0)
 
 	NOTE: Value and Value Size are left out if Tombstone is set.
+	NOTE: Fields marked with VAR are encoded using variable encoding and take up between 1 and 10 bytes.
 	NOTE: Records are sorted by Key
 */
 
@@ -39,6 +40,16 @@ type DataRecord struct {
 // DataBlock represents a data block in an SSTable.
 type DataBlock struct {
 	util.BinaryFile // Only file block because nothing is ever loaded into memory
+}
+
+// sizeOnDisk returns the number of bytes that DataRecord would occupy on disk.
+func (dr *DataRecord) sizeOnDisk() int {
+	buf := make([]byte, binary.MaxVarintLen64)
+	res := 4 + binary.PutUvarint(buf, dr.Timestamp) + 1 + binary.PutUvarint(buf, uint64(len(dr.Key))) + len(dr.Key)
+	if !dr.Tombstone {
+		res += binary.PutUvarint(buf, uint64(len(dr.Value))) + len(dr.Value)
+	}
+	return res
 }
 
 // getCRC calculates the CRC checksum of a given record
@@ -119,9 +130,7 @@ func (db *DataBlock) writeRecord(file *os.File, rec *DataRecord) error {
 		return err
 	}
 
-	bytes = make([]byte, 8)
-	binary.LittleEndian.PutUint64(bytes, rec.Timestamp)
-	_, err = file.Write(bytes)
+	err = util.WriteUvarint(file, rec.Timestamp)
 	if err != nil {
 		return err
 	}
@@ -138,17 +147,13 @@ func (db *DataBlock) writeRecord(file *os.File, rec *DataRecord) error {
 		}
 	}
 
-	bytes = make([]byte, 8)
-	binary.LittleEndian.PutUint64(bytes, uint64(len(rec.Key)))
-	_, err = file.Write(bytes)
+	err = util.WriteUvarint(file, uint64(len(rec.Key)))
 	if err != nil {
 		return err
 	}
 
 	if !rec.Tombstone {
-		bytes = make([]byte, 8)
-		binary.LittleEndian.PutUint64(bytes, uint64(len(rec.Value)))
-		_, err = file.Write(bytes)
+		err = util.WriteUvarint(file, uint64(len(rec.Value)))
 		if err != nil {
 			return err
 		}
@@ -199,12 +204,10 @@ func (db *DataBlock) getNextRecord(file *os.File) (*DataRecord, error) {
 	}
 	crc := binary.LittleEndian.Uint32(bytes)
 
-	bytes = make([]byte, 8)
-	_, err = file.Read(bytes)
+	timestamp, err := util.ReadUvarint(file)
 	if err != nil {
 		return nil, err
 	}
-	timestamp := binary.LittleEndian.Uint64(bytes)
 
 	bytes = make([]byte, 1)
 	_, err = file.Read(bytes)
@@ -213,21 +216,14 @@ func (db *DataBlock) getNextRecord(file *os.File) (*DataRecord, error) {
 	}
 	tombstone := bytes[0] == 1
 
-	bytes = make([]byte, 8)
-	_, err = file.Read(bytes)
-	if err != nil {
-		return nil, err
-	}
-	keySize := binary.LittleEndian.Uint64(bytes)
+	keySize, err := util.ReadUvarint(file)
 
 	var valueSize uint64
 	if !tombstone {
-		bytes = make([]byte, 8)
-		_, err = file.Read(bytes)
+		valueSize, err = util.ReadUvarint(file)
 		if err != nil {
 			return nil, err
 		}
-		valueSize = binary.LittleEndian.Uint64(bytes)
 	}
 
 	key := make([]byte, keySize)
@@ -290,7 +286,7 @@ func (db *DataBlock) GetRecordWithKeyFromOffset(key []byte, offset int64) (*Data
 	}
 
 	for {
-		dataRec, err := db.getRecordAtOffset(offset)
+		dataRec, err := db.getNextRecord(file)
 		if err != nil {
 			return nil, err
 		}
@@ -302,11 +298,6 @@ func (db *DataBlock) GetRecordWithKeyFromOffset(key []byte, offset int64) (*Data
 			return dataRec, nil
 		} else if cmp > 0 {
 			return nil, nil
-		}
-		if dataRec.Tombstone {
-			offset += 21 + int64(len(dataRec.Key))
-		} else {
-			offset += 29 + int64(len(dataRec.Key)) + int64(len(dataRec.Value))
 		}
 	}
 }

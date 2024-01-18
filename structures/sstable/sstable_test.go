@@ -345,20 +345,26 @@ func TestSSTable_Read(t *testing.T) {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
 
-	dr, err := sstable.Read([]byte("key1"))
+	rec, err := sstable.Read([]byte("key1"))
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}
-	if bytes.Compare(dr.Value, []byte("value1")) != 0 {
-		t.Errorf("Expected value of 'value1', got %v", dr.Value)
+	if rec == nil {
+		t.Errorf("Expected a record, got nil")
+	}
+	if bytes.Compare(rec.Value, []byte("value1")) != 0 {
+		t.Errorf("Expected value of 'value1', got %v", rec.Value)
 	}
 
-	dr, err = sstable.Read([]byte("key2"))
+	rec, err = sstable.Read([]byte("key2"))
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}
-	if bytes.Compare(dr.Value, []byte("value2")) != 0 {
-		t.Errorf("Expected value of 'value2', got %v", dr.Value)
+	if rec == nil {
+		t.Errorf("Expected a record, got nil")
+	}
+	if bytes.Compare(rec.Value, []byte("value2")) != 0 {
+		t.Errorf("Expected value of 'value2', got %v", rec.Value)
 	}
 }
 
@@ -408,36 +414,48 @@ func TestMergeSSTables(t *testing.T) {
 	}
 
 	// Check that the merged SSTable is correct.
-	dr, err := merged.Read([]byte("key1"))
+	rec, err := merged.Read([]byte("key1"))
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}
-	if bytes.Compare(dr.Value, []byte("value1")) != 0 {
-		t.Errorf("Expected value of 'value1', got %v", dr.Value)
+	if rec == nil {
+		t.Errorf("Expected a record, got nil")
+	}
+	if bytes.Compare(rec.Value, []byte("value1")) != 0 {
+		t.Errorf("Expected value of 'value1', got %v", rec.Value)
 	}
 
-	dr, err = merged.Read([]byte("key2"))
+	rec, err = merged.Read([]byte("key2"))
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}
-	if bytes.Compare(dr.Value, []byte("value2")) != 0 {
-		t.Errorf("Expected value of 'value2', got %v", dr.Value)
+	if rec == nil {
+		t.Errorf("Expected a record, got nil")
+	}
+	if bytes.Compare(rec.Value, []byte("value2")) != 0 {
+		t.Errorf("Expected value of 'value2', got %v", rec.Value)
 	}
 
-	dr, err = merged.Read([]byte("key3"))
+	rec, err = merged.Read([]byte("key3"))
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}
-	if bytes.Compare(dr.Value, []byte("value3")) != 0 {
-		t.Errorf("Expected value of 'value3', got %v", dr.Value)
+	if rec == nil {
+		t.Errorf("Expected a record, got nil")
+	}
+	if bytes.Compare(rec.Value, []byte("value3")) != 0 {
+		t.Errorf("Expected value of 'value3', got %v", rec.Value)
 	}
 
-	dr, err = merged.Read([]byte("key4"))
+	rec, err = merged.Read([]byte("key4"))
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}
-	if bytes.Compare(dr.Value, []byte("value4")) != 0 {
-		t.Errorf("Expected value of 'value4', got %v", dr.Value)
+	if rec == nil {
+		t.Errorf("Expected a record, got nil")
+	}
+	if bytes.Compare(rec.Value, []byte("value4")) != 0 {
+		t.Errorf("Expected value of 'value4', got %v", rec.Value)
 	}
 }
 
