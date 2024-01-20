@@ -18,7 +18,7 @@ func TestMerkleTree(t *testing.T) {
 	files := createTestFiles(t, tmpDir)
 
 	// Test NewMerkleTree function
-	var chunkSize int64 = 1024
+	var chunkSize int64 = 32
 	merkleTree := NewMerkleTree(files, chunkSize)
 
 	// Test Contains method
@@ -54,17 +54,17 @@ func createTestFiles(t *testing.T, tmpDir string) []util.BinaryFile {
 		{
 			filepath.Join(tmpDir, "file1"),
 			0,
-			10,
+			100,
 		},
 		{
 			filepath.Join(tmpDir, "file2"),
 			0,
-			10,
+			100,
 		},
 		{
 			filepath.Join(tmpDir, "file3"),
-			10,
-			20,
+			100,
+			200,
 		},
 	}
 
@@ -79,7 +79,7 @@ func createTestFiles(t *testing.T, tmpDir string) []util.BinaryFile {
 		if err != nil {
 			t.Fatalf("Failed to seek to the start offset of test file: %v", err)
 		}
-		_, err = f.Write(generateRandomBytes())
+		_, err = f.Write(generateRandomBytes(100))
 		if err != nil {
 			t.Fatalf("Failed to write to test file: %v", err)
 		}
@@ -88,8 +88,8 @@ func createTestFiles(t *testing.T, tmpDir string) []util.BinaryFile {
 	return files
 }
 
-func generateRandomBytes() []byte {
-	b := make([]byte, 10)
+func generateRandomBytes(size int) []byte {
+	b := make([]byte, size)
 	_, err := rand.Read(b)
 	if err != nil {
 		panic(err)
@@ -105,4 +105,80 @@ func generateRandomHash() Hash {
 		panic(err)
 	}
 	return randomHash
+}
+
+func BenchmarkNewMerkleTree(b *testing.B) {
+	tmpDir, err := os.MkdirTemp("", "merkle_test_")
+	if err != nil {
+		b.Fatalf("Failed to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	files := createBenchmarkFiles(b, tmpDir)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		NewMerkleTree(files, 32)
+	}
+}
+
+func BenchmarkMerkleTree_Equal(b *testing.B) {
+	tmpDir, err := os.MkdirTemp("", "merkle_test_")
+	if err != nil {
+		b.Fatalf("Failed to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	files := createBenchmarkFiles(b, tmpDir)
+
+	// Test NewMerkleTree function
+	var chunkSize int64 = 32
+	merkleTree := NewMerkleTree(files, chunkSize)
+
+	// Create another Merkle tree with the same data
+	anotherMerkleTree := NewMerkleTree(files, chunkSize)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		merkleTree.Equal(anotherMerkleTree)
+	}
+}
+
+func createBenchmarkFiles(b *testing.B, tmpDir string) []util.BinaryFile {
+	files := []util.BinaryFile{
+		{
+			filepath.Join(tmpDir, "file1"),
+			0,
+			1000,
+		},
+		{
+			filepath.Join(tmpDir, "file2"),
+			0,
+			1000,
+		},
+		{
+			filepath.Join(tmpDir, "file3"),
+			1000,
+			2000,
+		},
+	}
+
+	// Create the test files
+	for _, file := range files {
+		f, err := os.Create(file.Filename)
+		if err != nil {
+			b.Fatalf("Failed to create test file: %v", err)
+		}
+		defer f.Close()
+		_, err = f.Seek(file.StartOffset, 0)
+		if err != nil {
+			b.Fatalf("Failed to seek to the start offset of test file: %v", err)
+		}
+		_, err = f.Write(generateRandomBytes(1000))
+		if err != nil {
+			b.Fatalf("Failed to write to test file: %v", err)
+		}
+	}
+
+	return files
 }
