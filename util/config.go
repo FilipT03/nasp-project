@@ -17,8 +17,9 @@ type Config struct {
 }
 
 type WALConfig struct {
-	SegmentSize int `yaml:"segmentSize"`
-	BufferSize  int `yaml:"bufferSize"`
+	SegmentSize   uint64 `yaml:"segmentSize"`
+	BufferSize    int    `yaml:"bufferSize"`
+	WALFolderPath string `yaml:"walFolderPath"`
 }
 
 type MemtableConfig struct {
@@ -59,8 +60,9 @@ type CacheConfig struct {
 
 var config = &Config{
 	WAL: WALConfig{
-		SegmentSize: 32768,
-		BufferSize:  8,
+		SegmentSize:   32768,
+		BufferSize:    8,
+		WALFolderPath: "./wal",
 	},
 	Memtable: MemtableConfig{
 		MaxSize:   1024,
