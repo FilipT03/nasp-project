@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"nasp-project/model"
+	"nasp-project/structures/merkle_tree"
 	"nasp-project/util"
 	"os"
 	"path/filepath"
@@ -20,7 +21,7 @@ type SSTable struct {
 	MetadataFilename string
 }
 
-func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
+func initializeSSTable(level int, config *util.SSTableConfig) (*SSTable, error) {
 	path := filepath.Join(config.SavePath, fmt.Sprintf("L%03d", level))
 
 	label, err := getNextSStableLabel(filepath.Join(path, "TOC"))
@@ -34,23 +35,23 @@ func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
 		// Starting offset for each block is calculated after the previous block is written.
 		sstable = &SSTable{
 			Data: DataBlock{
-				Block{
+				util.BinaryFile{
 					Filename:    filepath.Join(path, "usertable-"+label+"-SSTable.db"),
 					StartOffset: 0,
 				},
 			},
 			Index: IndexBlock{
-				Block{
+				util.BinaryFile{
 					Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
 				},
 			},
 			Summary: SummaryBlock{
-				Block: Block{
+				BinaryFile: util.BinaryFile{
 					Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
 				},
 			},
 			Filter: FilterBlock{
-				Block: Block{
+				BinaryFile: util.BinaryFile{
 					Filename: filepath.Join(path, "usertable-"+label+"-SSTable.db"),
 				},
 			},
@@ -60,25 +61,25 @@ func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
 	} else {
 		sstable = &SSTable{
 			Data: DataBlock{
-				Block{
+				util.BinaryFile{
 					Filename:    filepath.Join(path, "usertable-"+label+"-Data.db"),
 					StartOffset: 0,
 				},
 			},
 			Index: IndexBlock{
-				Block{
+				util.BinaryFile{
 					Filename:    filepath.Join(path, "usertable-"+label+"-Index.db"),
 					StartOffset: 0,
 				},
 			},
 			Summary: SummaryBlock{
-				Block: Block{
+				BinaryFile: util.BinaryFile{
 					Filename:    filepath.Join(path, "usertable-"+label+"-Summary.db"),
 					StartOffset: 0,
 				},
 			},
 			Filter: FilterBlock{
-				Block: Block{
+				BinaryFile: util.BinaryFile{
 					Filename:    filepath.Join(path, "usertable-"+label+"-Filter.db"),
 					StartOffset: 0,
 				},
@@ -101,7 +102,7 @@ func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
 }
 
 // CreateSSTable creates an SSTable from the given data records and writes it to disk.
-func CreateSSTable(records []model.Record, config util.SSTableConfig) (*SSTable, error) {
+func CreateSSTable(records []model.Record, config *util.SSTableConfig) (*SSTable, error) {
 	sstable, err := initializeSSTable(1, config) // when creating from memory, always save to the level no 1
 	if err != nil {
 		return nil, err
@@ -144,11 +145,42 @@ func CreateSSTable(records []model.Record, config util.SSTableConfig) (*SSTable,
 	}
 	sstable.Filter.Filter = nil
 
-	// TODO: Write Merkle Tree to Metadata file
+	files := sstable.toBinaryFiles()
+	merkleTree := merkle_tree.NewMerkleTree(files, config.MerkleTreeChunkSize)
+	file, err := os.Create(sstable.MetadataFilename)
+	_, err = file.WriteString(merkleTree.Serialize())
+	if err != nil {
+		return nil, err
+	}
 
 	err = sstable.writeTOCFile()
 
 	return sstable, nil
+}
+
+func (sst *SSTable) toBinaryFiles() []util.BinaryFile {
+	return []util.BinaryFile{
+		{
+			Filename:    sst.Data.Filename,
+			StartOffset: sst.Data.StartOffset,
+			Size:        sst.Data.Size,
+		},
+		{
+			Filename:    sst.Index.Filename,
+			StartOffset: sst.Index.StartOffset,
+			Size:        sst.Index.Size,
+		},
+		{
+			Filename:    sst.Summary.Filename,
+			StartOffset: sst.Summary.StartOffset,
+			Size:        sst.Summary.Size,
+		},
+		{
+			Filename:    sst.Filter.Filename,
+			StartOffset: sst.Filter.StartOffset,
+			Size:        sst.Filter.Size,
+		},
+	}
 }
 
 // getNextSStableLabel finds the largest label number in the given path and returns the next label number.
@@ -341,7 +373,7 @@ func OpenSSTableFromToc(tocPath string) (*SSTable, error) {
 		switch i {
 		case 0:
 			sstable.Data = DataBlock{
-				Block{
+				util.BinaryFile{
 					Filename:    filename,
 					StartOffset: startOffset,
 					Size:        size,
@@ -349,7 +381,7 @@ func OpenSSTableFromToc(tocPath string) (*SSTable, error) {
 			}
 		case 1:
 			sstable.Index = IndexBlock{
-				Block{
+				util.BinaryFile{
 					Filename:    filename,
 					StartOffset: startOffset,
 					Size:        size,
@@ -357,7 +389,7 @@ func OpenSSTableFromToc(tocPath string) (*SSTable, error) {
 			}
 		case 2:
 			sstable.Summary = SummaryBlock{
-				Block: Block{
+				BinaryFile: util.BinaryFile{
 					Filename:    filename,
 					StartOffset: startOffset,
 					Size:        size,
@@ -365,7 +397,7 @@ func OpenSSTableFromToc(tocPath string) (*SSTable, error) {
 			}
 		case 3:
 			sstable.Filter = FilterBlock{
-				Block: Block{
+				BinaryFile: util.BinaryFile{
 					Filename:    filename,
 					StartOffset: startOffset,
 					Size:        size,
@@ -440,8 +472,6 @@ func (sst *SSTable) Read(key []byte) (*model.Record, error) {
 		return nil, err
 	}
 
-	// TODO: Check CRC
-
 	return &model.Record{
 		Key:       dr.Key,
 		Value:     dr.Value,
@@ -454,7 +484,7 @@ func (sst *SSTable) Read(key []byte) (*model.Record, error) {
 // Removes the input SSTables from disk.
 // Returns the new SSTable.
 // Returns an error if the merge fails.
-func MergeSSTables(sst1, sst2 *SSTable, level int, config util.SSTableConfig) (*SSTable, error) {
+func MergeSSTables(sst1, sst2 *SSTable, level int, config *util.SSTableConfig) (*SSTable, error) {
 	sstable, err := initializeSSTable(level, config)
 	if err != nil {
 		return nil, err
@@ -494,7 +524,13 @@ func MergeSSTables(sst1, sst2 *SSTable, level int, config util.SSTableConfig) (*
 	}
 	sstable.Filter.Filter = nil
 
-	// TODO: Write Merkle Tree to Metadata file
+	files := sstable.toBinaryFiles()
+	merkleTree := merkle_tree.NewMerkleTree(files, config.MerkleTreeChunkSize)
+	file, err := os.Create(sstable.MetadataFilename)
+	_, err = file.WriteString(merkleTree.Serialize())
+	if err != nil {
+		return nil, err
+	}
 
 	err = sstable.writeTOCFile()
 

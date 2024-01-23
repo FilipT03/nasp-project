@@ -3,6 +3,7 @@ package sstable
 import (
 	bytesUtil "bytes"
 	"encoding/binary"
+	"nasp-project/util"
 	"os"
 )
 
@@ -27,7 +28,7 @@ type SummaryRecord struct {
 }
 
 type SummaryBlock struct {
-	Block
+	util.BinaryFile
 	StartKey []byte
 	EndKey   []byte
 	Records  []SummaryRecord

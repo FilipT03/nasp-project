@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/edsrzf/mmap-go"
 	"hash/crc32"
-	"math"
 	"os"
 	"strconv"
 	"time"
@@ -367,22 +366,6 @@ func (wal *WAL) GetAllRecords() ([]*Record, error) {
 	fSize := fi.Size()
 	bytes := make([]byte, fSize)
 	_, _ = f.Read(bytes)
-	startFileIndex := binary.LittleEndian.Uint32(bytes[0:FileIndexSize])
-	startByteOffset := binary.LittleEndian.Uint32(bytes[FileIndexSize:MemtableIndexingSize])
-	firstMemtable := 0
-	var lowestFileIndex uint32 = math.MaxUint32
-	var lowestByteOffset uint32 = math.MaxUint32
-	offset := MemtableIndexingSize
-	for i := 0; int64(i) < (fSize-MemtableIndexingSize)/MemtableIndexingSize; i++ {
-		fileIndex := binary.LittleEndian.Uint32(bytes[offset+FileIndexStart : offset+FileIndexStart+FileIndexSize])
-		byteOffset := binary.LittleEndian.Uint32(bytes[offset+ByteOffsetStart : offset+ByteOffsetStart+ByteOffsetSize])
-		if fileIndex < lowestFileIndex || (fileIndex == lowestFileIndex && byteOffset == lowestByteOffset) {
-			lowestFileIndex = fileIndex
-			lowestByteOffset = byteOffset
-			firstMemtable = i
-		}
-		offset += MemtableIndexingSize
-	}
 
 	dirEntries, err := os.ReadDir(WALLogsPath)
 	if err != nil {

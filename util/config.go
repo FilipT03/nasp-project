@@ -9,16 +9,17 @@ import (
 // TODO: Add support for size-tiered, leveled and token bucket algorithms
 
 type Config struct {
-	WAL      WALConfig      `yaml:"WAL"`
-	Memtable MemtableConfig `yaml:"Memtable"`
-	SSTable  SSTableConfig  `yaml:"SSTable"`
-	LSMTree  LSMTreeConfig  `yaml:"LMS"`
-	Cache    CacheConfig    `yaml:"Cache"`
+	WAL         WALConfig         `yaml:"WAL"`
+	Memtable    MemtableConfig    `yaml:"Memtable"`
+	SSTable     SSTableConfig     `yaml:"SSTable"`
+	LSMTree     LSMTreeConfig     `yaml:"LSMTree"`
+	Cache       CacheConfig       `yaml:"Cache"`
+	TokenBucket TokenBucketConfig `yaml:"TokenBucket"`
 }
 
 type WALConfig struct {
-	SegmentSize int `yaml:"segmentSize"`
-	BufferSize  int `yaml:"bufferSize"`
+	SegmentSize uint64 `yaml:"segmentSize"`
+	BufferSize  uint32 `yaml:"bufferSize"`
 }
 
 type MemtableConfig struct {
@@ -38,20 +39,28 @@ type SkipListConfig struct {
 }
 
 type SSTableConfig struct {
-	SavePath        string  `yaml:"savePath"`
-	SingleFile      bool    `yaml:"singleFile"`
-	SummaryDegree   int     `yaml:"summaryDegree"`
-	IndexDegree     int     `yaml:"indexDegree"`
-	Compression     bool    `yaml:"compression"`
-	FilterPrecision float64 `yaml:"filterPrecision"`
+	SavePath            string  `yaml:"savePath"`
+	SingleFile          bool    `yaml:"singleFile"`
+	SummaryDegree       int     `yaml:"summaryDegree"`
+	IndexDegree         int     `yaml:"indexDegree"`
+	Compression         bool    `yaml:"compression"`
+	FilterPrecision     float64 `yaml:"filterPrecision"`
+	MerkleTreeChunkSize int64   `yaml:"merkleTreeChunkSize"`
 }
 
 type LSMTreeConfig struct {
-	MaxLevel int `yaml:"maxLevel"`
+	MaxLevel            int    `yaml:"maxLevel"`
+	CompactionAlgorithm string `yaml:"compactionAlgorithm"`
+	MaxLsmNodesPerLevel int    `yaml:"maxLsmNodesPerLevel"`
 }
 
 type CacheConfig struct {
-	MaxSize int `yaml:"maxSize"`
+	MaxSize uint64 `yaml:"maxSize"`
+}
+
+type TokenBucketConfig struct {
+	MaxTokenSize int64 `yaml:"maxTokenSize"`
+	Interval     int64 `yaml:"interval"`
 }
 
 var config = &Config{
@@ -71,18 +80,25 @@ var config = &Config{
 		},
 	},
 	SSTable: SSTableConfig{
-		SavePath:        "./data",
-		SingleFile:      false,
-		SummaryDegree:   5,
-		IndexDegree:     5,
-		Compression:     true,
-		FilterPrecision: 0.01,
+		SavePath:            "./data",
+		SingleFile:          false,
+		SummaryDegree:       5,
+		IndexDegree:         5,
+		Compression:         true,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 1024,
 	},
 	LSMTree: LSMTreeConfig{
-		MaxLevel: 4,
+		MaxLevel:            4,
+		CompactionAlgorithm: "Size-Tiered",
+		MaxLsmNodesPerLevel: 8,
 	},
 	Cache: CacheConfig{
 		MaxSize: 1024,
+	},
+	TokenBucket: TokenBucketConfig{
+		MaxTokenSize: 1024,
+		Interval:     60,
 	},
 }
 
