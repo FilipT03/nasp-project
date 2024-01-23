@@ -26,3 +26,6 @@ go.work
 
 # Database files
 data
+
+# Write Ahead Log files
+wal
