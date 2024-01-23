@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/edsrzf/mmap-go"
+	"hash/crc32"
 	"nasp-project/util"
 	"os"
 	"strconv"
@@ -43,9 +44,15 @@ const (
 
 	HeaderSize = 8
 
-	WALPath     = "wal" + string(os.PathSeparator)
 	NumberStart = 4
-	NumberEnd   = 8
+	NumberEnd   = 12
+
+	FileIndexSize  = 4
+	ByteOffsetSize = 8
+
+	FileIndexStart       = 0
+	ByteOffsetStart      = FileIndexStart + FileIndexSize
+	MemtableIndexingSize = FileIndexSize + ByteOffsetSize
 )
 
 // Record structure for WAL commits
@@ -61,17 +68,23 @@ type Record struct {
 
 // WAL - Write ahead log
 type WAL struct {
-	buffer         []*Record
-	bufferSize     uint32
-	segmentSize    uint64
-	latestFileName string
+	buffer               []*Record
+	bufferSize           int
+	segmentSize          uint64
+	walFolderPath        string
+	logsPath             string
+	memtableIndexingPath string
+	latestFileName       string
 }
 
 // NewWAL is constructor for the Write ahead log.
-func NewWAL(bufferSize uint32, segmentSize uint64) (*WAL, error) {
-	dirEntries, err := os.ReadDir(WALPath)
+func NewWAL(walConfig util.WALConfig, instances int) (*WAL, error) {
+	logsPath := walConfig.WALFolderPath + string(os.PathSeparator) + "logs" + string(os.PathSeparator)
+	memtableIndexingPath := walConfig.WALFolderPath + string(os.PathSeparator) + "memtable_indexing.bin"
+
+	dirEntries, err := os.ReadDir(logsPath)
 	if os.IsNotExist(err) {
-		err := os.Mkdir(WALPath, 0777)
+		err := os.MkdirAll(logsPath, os.ModeDir)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +93,14 @@ func NewWAL(bufferSize uint32, segmentSize uint64) (*WAL, error) {
 	}
 	var latestFileName = ""
 	if len(dirEntries) == 0 {
-		f, err := os.OpenFile(WALPath+"wal_0001.log", os.O_RDWR|os.O_CREATE, 0644)
+		latestFileName = "wal_"
+		missing := (NumberEnd - NumberStart) - 1
+		for missing > 0 {
+			latestFileName += "0"
+			missing -= 1
+		}
+		latestFileName += "1.log"
+		f, err := os.OpenFile(logsPath+latestFileName, os.O_RDWR|os.O_CREATE, 0644)
 		if err != nil {
 			return nil, err
 		}
@@ -96,15 +116,31 @@ func NewWAL(bufferSize uint32, segmentSize uint64) (*WAL, error) {
 		if err != nil {
 			return nil, err
 		}
-		latestFileName = "wal_0001.log"
 	} else {
 		latestFileName = dirEntries[len(dirEntries)-1].Name()
 	}
+	f, err := os.OpenFile(memtableIndexingPath, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	err = f.Truncate(int64(MemtableIndexingSize))
+	if err != nil {
+		return nil, err
+	}
+	err = f.Truncate(int64((MemtableIndexingSize + 1) * instances))
+	if err != nil {
+		return nil, err
+	}
+
 	return &WAL{
-		buffer:         make([]*Record, 0),
-		bufferSize:     bufferSize,
-		segmentSize:    segmentSize,
-		latestFileName: latestFileName,
+		buffer:               make([]*Record, 0),
+		bufferSize:           walConfig.BufferSize,
+		segmentSize:          walConfig.SegmentSize,
+		walFolderPath:        walConfig.WALFolderPath,
+		logsPath:             logsPath,
+		memtableIndexingPath: memtableIndexingPath,
+		latestFileName:       latestFileName,
 	}, nil
 }
 
@@ -123,12 +159,106 @@ func (wal *WAL) DeleteCommit(key string, value []byte) {
 // commitRecord adds record to the buffer, and calls writeBuffer if it's full.
 func (wal *WAL) commitRecord(record *Record) {
 	wal.buffer = append(wal.buffer, record)
-	if uint32(len(wal.buffer)) >= wal.bufferSize {
+	if len(wal.buffer) >= wal.bufferSize {
 		err := wal.writeBuffer()
 		if err != nil {
 			wal.buffer = make([]*Record, 0)
 		}
 	}
+}
+
+// FlushedMemtable is called by a memtable.Memtable after it was successfully flushed into the sstable.SSTable.
+// Deletes old logs that were written in the SSTable during the flushing.
+func (wal *WAL) FlushedMemtable(memtableIndex int) error {
+	err := wal.writeBuffer()
+	if err != nil {
+		wal.buffer = make([]*Record, 0)
+	}
+	f, err := os.OpenFile(wal.memtableIndexingPath, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	_, err = f.Seek(int64(MemtableIndexingSize*(memtableIndex+1)), 0)
+	if err != nil {
+		return err
+	}
+	bytes := make([]byte, MemtableIndexingSize)
+	_, err = f.Read(bytes)
+	if err != nil {
+		return err
+	}
+	fileIndex := binary.LittleEndian.Uint32(bytes[FileIndexStart : FileIndexStart+FileIndexSize])
+	byteOffset := binary.LittleEndian.Uint64(bytes[ByteOffsetStart : ByteOffsetStart+ByteOffsetSize])
+
+	// Deleting the unneeded logs
+	dirEntries, err := os.ReadDir(wal.logsPath)
+	if err != nil {
+		return err
+	}
+	stringNumber := strconv.Itoa(int(fileIndex))
+	missing := (NumberEnd - NumberStart) - len(stringNumber)
+	for missing > 0 {
+		stringNumber = "0" + stringNumber
+		missing -= 1
+	}
+	endFile := "wal_" + stringNumber + ".log"
+	for _, entry := range dirEntries {
+		if entry.Name() == endFile {
+			break
+		}
+		err := os.Remove(wal.logsPath + entry.Name())
+		if err != nil {
+			return err
+		}
+	}
+
+	// Updating the memtable indexing
+	latestFile, err := os.OpenFile(wal.logsPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	latestFileStat, err := latestFile.Stat()
+	if err != nil {
+		return err
+	}
+	latestFileSize := latestFileStat.Size()
+	bytes = make([]byte, 0)
+	newFileIndex, err := strconv.Atoi(wal.latestFileName[NumberStart:NumberEnd])
+	var newByteOffset uint64
+	if latestFileSize <= HeaderSize {
+		newFileIndex--
+		newByteOffset = wal.segmentSize
+	} else {
+		newByteOffset = uint64(latestFileSize)
+	}
+	if err != nil {
+		return err
+	}
+	bytes = binary.LittleEndian.AppendUint32(bytes, uint32(newFileIndex))
+	bytes = binary.LittleEndian.AppendUint64(bytes, newByteOffset)
+
+	_, err = f.Seek(-int64(MemtableIndexingSize), 1)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(bytes)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+	bytes = make([]byte, 0)
+	bytes = binary.LittleEndian.AppendUint32(bytes, uint32(fileIndex))
+	bytes = binary.LittleEndian.AppendUint64(bytes, byteOffset)
+	_, err = f.Write(bytes)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // incrementWALFileName increments WAL latestFileName by one.
@@ -151,7 +281,7 @@ func (wal *WAL) incrementWALFileName() error {
 func (wal *WAL) writeBuffer() error {
 	toWrite := make([]byte, 0)
 
-	f, err := os.OpenFile(WALPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
+	f, err := os.OpenFile(wal.logsPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
@@ -166,19 +296,17 @@ func (wal *WAL) writeBuffer() error {
 		if err != nil {
 			return err
 		}
-		f, err := os.OpenFile(WALPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
+		f, err = os.OpenFile(wal.logsPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
 		if err != nil {
 			return err
 		}
-		fStat, _ = f.Stat()
-		fSize = fStat.Size()
-	}
-	defer f.Close()
-	if fSize == 0 {
+		fSize = HeaderSize
+	} else if fSize == 0 {
 		// we will look at empty files as if they contained the header, because no file can be smaller than
 		// the HeaderSize
 		fSize = HeaderSize
 	}
+	defer f.Close()
 
 	var nextHeader uint64 = 0
 	for _, element := range wal.buffer {
@@ -189,7 +317,7 @@ func (wal *WAL) writeBuffer() error {
 			// while there is more to write that a single file can fit
 			for uint64(len(combinedSlice))-offset > (wal.segmentSize - HeaderSize) {
 				var err error
-				err = wal.writeSlice(nextHeader, combinedSlice[offset:offset+(wal.segmentSize-uint64(fSize))], WALPath+wal.latestFileName)
+				err = wal.writeSlice(nextHeader, combinedSlice[offset:offset+(wal.segmentSize-uint64(fSize))], wal.logsPath+wal.latestFileName)
 				offset += wal.segmentSize - uint64(fSize)
 				fSize = HeaderSize
 				// in case the loop continues, we need to prepare the nextHeader
@@ -208,7 +336,7 @@ func (wal *WAL) writeBuffer() error {
 		} else {
 			toWrite = append(toWrite, nextSlice...)
 			if uint64(len(toWrite)) == (wal.segmentSize - uint64(fSize)) {
-				err := wal.writeSlice(nextHeader, toWrite, WALPath+wal.latestFileName)
+				err := wal.writeSlice(nextHeader, toWrite, wal.logsPath+wal.latestFileName)
 				if err != nil {
 					return err
 				}
@@ -223,13 +351,13 @@ func (wal *WAL) writeBuffer() error {
 		}
 	}
 	if len(toWrite) > 0 {
-		err := wal.writeSlice(nextHeader, toWrite, WALPath+wal.latestFileName)
+		err := wal.writeSlice(nextHeader, toWrite, wal.logsPath+wal.latestFileName)
 		if err != nil {
 			return err
 		}
 	}
 	// the latest file shouldn't be completely filled
-	f, err = os.OpenFile(WALPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
+	f, err = os.OpenFile(wal.logsPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
@@ -302,21 +430,52 @@ func (wal *WAL) writeSlice(remainderSize uint64, slice []byte, path string) erro
 	return nil
 }
 
-// GetAllRecords reads record from WAL files and returns them.
-func (wal *WAL) GetAllRecords() ([]*Record, error) {
-	var returnError error = nil
-	dirEntries, err := os.ReadDir(WALPath)
+// GetAllRecords reads records from WAL files and returns them with two additional slices, one for ending file index of
+// that record and other for the byte offset.
+func (wal *WAL) GetAllRecords() ([]*Record, []uint32, []uint64, error) {
+	f, err := os.OpenFile(wal.memtableIndexingPath, os.O_RDWR, 0644)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
-	result := make([]*Record, 0)
-	var remainderSlice []byte = nil
-	for _, entry := range dirEntries {
-		path := WALPath + entry.Name()
+	fi, _ := f.Stat()
+	fSize := fi.Size()
+	bytes := make([]byte, fSize)
+	_, _ = f.Read(bytes)
+	startFileIndex := binary.LittleEndian.Uint32(bytes[0:FileIndexSize])
+	startByteOffset := binary.LittleEndian.Uint64(bytes[FileIndexSize:MemtableIndexingSize])
 
+	dirEntries, err := os.ReadDir(wal.logsPath)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	records := make([]*Record, 0)
+	allFileIndexes := make([]uint32, 0)
+	allByteOffsets := make([]uint64, 0)
+	var remainderSlice []byte = nil
+
+	oldestFileIndex, err := strconv.Atoi(dirEntries[0].Name()[NumberStart:NumberEnd])
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	toSkip := startFileIndex - uint32(oldestFileIndex)
+	if toSkip < 0 {
+		return nil, nil, nil, errors.New("error: memtable indexing file referencing non existent files")
+	}
+
+	first := true
+	for _, entry := range dirEntries {
+		if toSkip > 0 {
+			toSkip--
+			continue
+		}
+		currectFileIndex, err := strconv.Atoi(entry.Name()[NumberStart:NumberEnd])
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		path := wal.logsPath + entry.Name()
 		f, err := os.OpenFile(path, os.O_RDWR, 0644)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 
 		fi, _ := f.Stat()
@@ -328,28 +487,34 @@ func (wal *WAL) GetAllRecords() ([]*Record, error) {
 
 		mmapFile, err := mmap.Map(f, mmap.RDWR, 0)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 
 		header := binary.LittleEndian.Uint64(mmapFile[0:HeaderSize])
-		fmt.Println("header: ", header)
+		if first {
+			first = false
+			header = startByteOffset
+		}
+		//fmt.Println("header: ", header)
 		if remainderSlice != nil { // we need to combine the end of the last file and start of this one
 			record, err := wal.readRecordFromSlice(0, append(remainderSlice, mmapFile[HeaderSize:header]...))
 			if err != nil {
-				return nil, err
+				return nil, nil, nil, err
 			}
 			if record == nil { // the record is in more than two files
 				remainderSlice = append(remainderSlice, mmapFile[HeaderSize:]...)
 				break
 			} else {
-				result = append(result, record)
+				records = append(records, record)
+				allFileIndexes = append(allFileIndexes, uint32(currectFileIndex))
+				allByteOffsets = append(allByteOffsets, header)
 				remainderSlice = nil
 			}
 		}
 		for offset := header; offset < uint64(fSize); {
 			record, err := wal.readRecordFromSlice(offset, mmapFile)
 			if err != nil {
-				return nil, err
+				return nil, nil, nil, err
 			}
 			if record == nil { // we reached end of the file
 				remainderLength := uint64(len(mmapFile)) - offset
@@ -357,21 +522,43 @@ func (wal *WAL) GetAllRecords() ([]*Record, error) {
 				copy(remainderSlice, mmapFile[offset:])
 				break
 			} else {
-				result = append(result, record)
+				records = append(records, record)
 				offset += KeyStart + record.KeySize + record.ValueSize
+				allFileIndexes = append(allFileIndexes, uint32(currectFileIndex))
+				allByteOffsets = append(allByteOffsets, offset)
 			}
 		}
 
 		err = mmapFile.Unmap()
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 		err = f.Close()
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 	}
-	return result, returnError
+	return records, allFileIndexes, allByteOffsets, nil
+	//return memtableData, firstMemtable, returnError
+}
+
+// UpdateMemtableIndexing updates memtable indexing file with new values got from memtable.Memtable
+func (wal *WAL) UpdateMemtableIndexing(fileIndexes []uint32, byteOffsets []uint64) error {
+	f, err := os.OpenFile(wal.memtableIndexingPath, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	_, err = f.Seek(MemtableIndexingSize, 0)
+	if err != nil {
+		return err
+	}
+
+	bytes := make([]byte, 0)
+	for i := 0; i < len(fileIndexes); i++ {
+		bytes = binary.LittleEndian.AppendUint32(bytes, fileIndexes[i])
+		bytes = binary.LittleEndian.AppendUint64(bytes, byteOffsets[i])
+	}
+	return nil
 }
 
 // readRecord reads Record from slice with offset. Returns the read Record and error if any occurred. Returns nil record
@@ -399,7 +586,7 @@ func (wal *WAL) readRecordFromSlice(offset uint64, slice []byte) (*Record, error
 	result.Value = make([]byte, result.ValueSize)
 	copy(result.Value, slice[(offset+KeyStart+result.KeySize):(offset+KeyStart+result.KeySize+result.ValueSize)])
 
-	if util.CRC32(result.Value) != result.CRC {
+	if CRC32(result.Value) != result.CRC {
 		return nil, errors.New("failed to read record of offset" + strconv.FormatUint(offset, 10) + ": CRCs don't match")
 	}
 	return result, nil
@@ -408,7 +595,7 @@ func (wal *WAL) readRecordFromSlice(offset uint64, slice []byte) (*Record, error
 // recordToByteArray converts Record to byte array.
 func (wal *WAL) recordToByteArray(record *Record) []byte {
 	result := make([]byte, 0)
-	result = binary.LittleEndian.AppendUint32(result, util.CRC32(record.Value))
+	result = binary.LittleEndian.AppendUint32(result, CRC32(record.Value))
 	result = binary.LittleEndian.AppendUint64(result, record.Timestamp)
 	if record.Tombstone {
 		result = append(result, byte(1))
@@ -427,7 +614,7 @@ func (wal *WAL) recordToByteArray(record *Record) []byte {
 // createRecord constructs Record.
 func createRecord(key string, value []byte, tombstone bool) *Record {
 	return &Record{
-		CRC:       util.CRC32(value),         //Generate CRC
+		CRC:       CRC32(value),              //Generate CRC
 		Timestamp: uint64(time.Now().Unix()), //Get current time
 		Tombstone: tombstone,
 		KeySize:   uint64(len(key)),
@@ -457,39 +644,7 @@ func printRecord(record *Record) {
 	fmt.Println()
 }
 
-func (wal *WAL) Test() {
-	arrayT := make([]byte, 0, 90)
-	for i := 0; i < 90; i++ {
-		arrayT = append(arrayT, byte('t'))
-	}
-	arrayP := make([]byte, 0, 98)
-	for i := 0; i < 90; i++ {
-		arrayP = append(arrayP, byte('p'))
-	}
-	//arrayP := append(arrayT, "tttttttt"...)
-	//record120 := createRecord("T", arrayT, false)
-	//record128 := createRecord("P", append(arrayT, "tttttttt"...), false)
-	//fmt.Println(KeyStart + record120.KeySize + record120.ValueSize)
-	//fmt.Println(KeyStart + record128.KeySize + record128.ValueSize)
-	//fmt.Println(array100)
-	wal.PutCommit("T", arrayT)
-	wal.PutCommit("P", arrayP)
-	err := wal.writeBuffer()
-	if err != nil {
-		panic(err)
-	}
-	records, err := wal.GetAllRecords()
-	if err != nil {
-		panic(err.Error())
-	}
-	for _, record := range records {
-		printRecord(record)
-	}
-
-	/*res, err := wal.readRecord("wal_test.log", wal.segmentSize)
-	print(err)
-	printRecord(res)
-	res, err = wal.readRecord("wal_test.log", wal.segmentSize*3)
-	print(err)
-	printRecord(res)*/
+// CRC32 calculates CRC checksum for the given byte array.
+func CRC32(data []byte) uint32 {
+	return crc32.ChecksumIEEE(data)
 }

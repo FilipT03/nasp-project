@@ -6,6 +6,8 @@ import (
 	"os"
 )
 
+// TODO: Add support for size-tiered, leveled and token bucket algorithms
+
 type Config struct {
 	WAL         WALConfig         `yaml:"WAL"`
 	Memtable    MemtableConfig    `yaml:"Memtable"`
@@ -16,8 +18,9 @@ type Config struct {
 }
 
 type WALConfig struct {
-	SegmentSize uint64 `yaml:"segmentSize"`
-	BufferSize  uint32 `yaml:"bufferSize"`
+	SegmentSize   uint64 `yaml:"segmentSize"`
+	BufferSize    int    `yaml:"bufferSize"`
+	WALFolderPath string `yaml:"walFolderPath"`
 }
 
 type MemtableConfig struct {
@@ -63,8 +66,9 @@ type TokenBucketConfig struct {
 
 var config = &Config{
 	WAL: WALConfig{
-		SegmentSize: 512,
-		BufferSize:  128,
+		SegmentSize:   32768,
+		BufferSize:    8,
+		WALFolderPath: "./wal",
 	},
 	Memtable: MemtableConfig{
 		MaxSize:   1024,
