@@ -81,9 +81,10 @@ type WAL struct {
 func NewWAL(walConfig util.WALConfig, instances int) (*WAL, error) {
 	logsPath := walConfig.WALFolderPath + string(os.PathSeparator) + "logs" + string(os.PathSeparator)
 	memtableIndexingPath := walConfig.WALFolderPath + string(os.PathSeparator) + "memtable_indexing.bin"
+
 	dirEntries, err := os.ReadDir(logsPath)
 	if os.IsNotExist(err) {
-		err := os.Mkdir(logsPath, os.ModeDir)
+		err := os.MkdirAll(logsPath, os.ModeDir)
 		if err != nil {
 			return nil, err
 		}
@@ -167,6 +168,7 @@ func (wal *WAL) commitRecord(record *Record) {
 }
 
 // FlushedMemtable is called by a memtable.Memtable after it was successfully flushed into the sstable.SSTable.
+// Deletes old logs that were written in the SSTable during the flushing.
 func (wal *WAL) FlushedMemtable(memtableIndex int) error {
 	err := wal.writeBuffer()
 	if err != nil {
@@ -186,6 +188,7 @@ func (wal *WAL) FlushedMemtable(memtableIndex int) error {
 		return err
 	}
 	fileIndex := binary.LittleEndian.Uint32(bytes[FileIndexStart : FileIndexStart+FileIndexSize])
+	byteOffset := binary.LittleEndian.Uint64(bytes[ByteOffsetStart : ByteOffsetStart+ByteOffsetSize])
 
 	// Deleting the unneeded logs
 	dirEntries, err := os.ReadDir(wal.logsPath)
@@ -238,6 +241,18 @@ func (wal *WAL) FlushedMemtable(memtableIndex int) error {
 	if err != nil {
 		return err
 	}
+	_, err = f.Write(bytes)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+	bytes = make([]byte, 0)
+	bytes = binary.LittleEndian.AppendUint32(bytes, uint32(fileIndex))
+	bytes = binary.LittleEndian.AppendUint64(bytes, byteOffset)
 	_, err = f.Write(bytes)
 	if err != nil {
 		return err
@@ -415,7 +430,8 @@ func (wal *WAL) writeSlice(remainderSize uint64, slice []byte, path string) erro
 	return nil
 }
 
-// GetAllRecords reads record from WAL files and returns them separated for each memtable.
+// GetAllRecords reads records from WAL files and returns them with two additional slices, one for ending file index of
+// that record and other for the byte offset.
 func (wal *WAL) GetAllRecords() ([]*Record, []uint32, []uint64, error) {
 	f, err := os.OpenFile(wal.memtableIndexingPath, os.O_RDWR, 0644)
 	if err != nil {
@@ -526,8 +542,23 @@ func (wal *WAL) GetAllRecords() ([]*Record, []uint32, []uint64, error) {
 	//return memtableData, firstMemtable, returnError
 }
 
-func UpdateMemtableIndexing(fileIndexes []uint32, byteOffsets []uint64) {
+// UpdateMemtableIndexing updates memtable indexing file with new values got from memtable.Memtable
+func (wal *WAL) UpdateMemtableIndexing(fileIndexes []uint32, byteOffsets []uint64) error {
+	f, err := os.OpenFile(wal.memtableIndexingPath, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	_, err = f.Seek(MemtableIndexingSize, 0)
+	if err != nil {
+		return err
+	}
 
+	bytes := make([]byte, 0)
+	for i := 0; i < len(fileIndexes); i++ {
+		bytes = binary.LittleEndian.AppendUint32(bytes, fileIndexes[i])
+		bytes = binary.LittleEndian.AppendUint64(bytes, byteOffsets[i])
+	}
+	return nil
 }
 
 // readRecord reads Record from slice with offset. Returns the read Record and error if any occurred. Returns nil record
