@@ -3,23 +3,19 @@ package lru_cache
 import (
 	"container/list"
 	"fmt"
+	"nasp-project/model"
 )
-
-type Data struct {
-	key   uint64
-	value []byte
-}
 
 type LRUCache struct {
 	capacity uint64
-	cache    map[uint64]*list.Element
+	cache    map[string]*list.Element
 	list     *list.List
 }
 
 func NewLRUCache(capacity uint64) LRUCache {
 	lruCache := LRUCache{
 		capacity: capacity,
-		cache:    make(map[uint64]*list.Element),
+		cache:    make(map[string]*list.Element),
 		list:     list.New(),
 	}
 
@@ -27,20 +23,20 @@ func NewLRUCache(capacity uint64) LRUCache {
 }
 
 // Get returns *Data for specified key, or nil if absent
-func (LRU *LRUCache) Get(key uint64) *Data {
+func (LRU *LRUCache) Get(key string) *model.Record {
 	element := LRU.get(key)
 	if element != nil {
-		return element.Value.(*Data)
+		return element.Value.(*model.Record)
 	}
 	return nil
 }
 
 // Used for my Put function to get list element
-func (LRU *LRUCache) get(key uint64) *list.Element {
+func (LRU *LRUCache) get(key string) *list.Element {
 
 	value, ok := LRU.cache[key]
 	if ok {
-		//TODO update to most recent
+		LRU.list.MoveToFront(value)
 		return value
 	}
 	return nil
@@ -48,17 +44,17 @@ func (LRU *LRUCache) get(key uint64) *list.Element {
 }
 
 // Put adds or updates the value for specified key
-func (LRU *LRUCache) Put(key uint64, value []byte) {
-	data := Data{key: key, value: value}
+func (LRU *LRUCache) Put(record *model.Record) {
+	key := string(record.Key)
 	findElement := LRU.get(key)
 
 	//if the record already exists
 	if findElement != nil {
 		//deleting from the map
-		delete(LRU.cache, findElement.Value.(Data).key)
+		delete(LRU.cache, key)
 		//deleting from the list
 		LRU.list.Remove(findElement)
-		LRU.list.PushFront(data)
+		LRU.list.PushFront(record)
 		LRU.cache[key] = LRU.list.Front()
 		return
 
@@ -67,12 +63,12 @@ func (LRU *LRUCache) Put(key uint64, value []byte) {
 	//case cache is full, and we delete the last(LRU) record
 	if uint64(LRU.list.Len()) == LRU.capacity {
 		//deleting from the map
-		delete(LRU.cache, LRU.list.Back().Value.(Data).key)
+		delete(LRU.cache, string(LRU.list.Back().Value.(*model.Record).Key))
 		//deleting from the list
 		LRU.list.Remove(LRU.list.Back())
 	}
 
-	LRU.list.PushFront(data)
+	LRU.list.PushFront(record)
 	LRU.cache[key] = LRU.list.Front()
 	return
 
@@ -84,7 +80,7 @@ func (LRU *LRUCache) Print() {
 	node := LRU.list.Front()
 	for node != nil {
 
-		fmt.Println(i, node.Value.(Data).key, node.Value.(Data).value)
+		fmt.Println(i, node.Value.(*model.Record).Key, node.Value.(*model.Record).Value)
 		node = node.Next()
 		i++
 	}

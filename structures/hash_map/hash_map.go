@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"nasp-project/model"
 	"sort"
+	"time"
 )
 
 type HashMap struct {
@@ -30,6 +31,8 @@ func (hm *HashMap) Delete(key []byte) error {
 		return err
 	}
 	record.Tombstone = true
+	record.Value = nil
+	record.Timestamp = uint64(time.Now().Unix())
 	return nil
 }
 
@@ -60,4 +63,8 @@ func (hm *HashMap) Flush() []model.Record {
 
 func (hm *HashMap) Clear() {
 	hm.data = make(map[string]*model.Record)
+}
+
+func (hm *HashMap) IsFull() bool {
+	return len(hm.data) == int(hm.capacity)
 }

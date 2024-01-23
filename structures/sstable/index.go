@@ -3,6 +3,7 @@ package sstable
 import (
 	"bytes"
 	"encoding/binary"
+	"nasp-project/util"
 	"os"
 )
 
@@ -25,7 +26,7 @@ type IndexRecord struct {
 }
 
 type IndexBlock struct {
-	Block // Only block because nothing is ever loaded into memory
+	util.BinaryFile // Only file block because nothing is ever loaded into memory
 }
 
 // CreateFromDataBlock creates an index block from the given data block and writes it to disk.

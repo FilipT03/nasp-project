@@ -16,7 +16,13 @@ SSTable:
     indexDegree: 5
     compression: false
     filterPrecision: 0.01
+    merkleTreeChunkSize: 1024
 LSMTree:
     maxLevel: 4
+    compactionAlgorithm: Size-Tiered # Size-Tiered, Leveled
+    maxLsmNodesPerLevel: 8
 Cache:
     maxSize: 1024
+TokenBucket:
+    maxTokenSize: 1024
+    interval: 60
