@@ -1,7 +1,7 @@
 WAL:
     segmentSize: 32768
     bufferSize: 8
-MemTable:
+Memtable:
     maxSize: 1024
     structure: SkipList
     instances: 1
