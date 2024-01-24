@@ -499,6 +499,11 @@ func OpenSSTableFromToc(tocPath string) (*SSTable, error) {
 	return sstable, nil
 }
 
+// Size returns the total size of files that make up the SSTable in bytes.
+func (sst *SSTable) Size() int64 {
+	return sst.Data.Size + sst.Index.Size + sst.Summary.Size + sst.Filter.Size
+}
+
 // Read returns the record with the given key from the SSTable.
 // Returns nil if the key does not exist.
 // Returns an error if the read fails.
