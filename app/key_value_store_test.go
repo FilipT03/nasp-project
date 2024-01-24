@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"nasp-project/util"
 	"os"
 	"path"
@@ -15,10 +14,11 @@ func TestNewKeyValueStore(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
+	config := util.GetConfig()
+	config.SSTable.SavePath = path.Join(tmpDir, "sstable")
+	config.WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
-	db, err := NewKeyValueStore()
+	db, err := NewKeyValueStore(config)
 	if err != nil {
 		t.Fatalf("Failed to create key-value store: %v", err)
 	}
@@ -47,11 +47,11 @@ func TestKeyValueStore_Put(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	fmt.Println(tmpDir)
+	config := util.GetConfig()
+	config.SSTable.SavePath = path.Join(tmpDir, "sstable")
+	config.WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
-	util.SaveConfig(path.Join(tmpDir, "config.yaml"))
-
-	db, err := NewKeyValueStore()
+	db, err := NewKeyValueStore(config)
 	if err != nil {
 		t.Fatalf("Failed to create key-value store: %v", err)
 	}
@@ -72,10 +72,11 @@ func TestKeyValueStore_Get(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
+	config := util.GetConfig()
+	config.SSTable.SavePath = path.Join(tmpDir, "sstable")
+	config.WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
-	db, err := NewKeyValueStore()
+	db, err := NewKeyValueStore(config)
 	if err != nil {
 		t.Fatalf("Failed to create key-value store: %v", err)
 	}
@@ -105,10 +106,11 @@ func TestKeyValueStore_Get_NonExistentKey(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
+	config := util.GetConfig()
+	config.SSTable.SavePath = path.Join(tmpDir, "sstable")
+	config.WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
-	db, err := NewKeyValueStore()
+	db, err := NewKeyValueStore(config)
 	if err != nil {
 		t.Fatalf("Failed to create key-value store: %v", err)
 	}
@@ -132,10 +134,11 @@ func TestKeyValueStore_Delete(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
+	config := util.GetConfig()
+	config.SSTable.SavePath = path.Join(tmpDir, "sstable")
+	config.WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
-	db, err := NewKeyValueStore()
+	db, err := NewKeyValueStore(config)
 	if err != nil {
 		t.Fatalf("Failed to create key-value store: %v", err)
 	}
@@ -159,12 +162,13 @@ func TestKeyValueStore_GetRateLimitReached(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
+	config := util.GetConfig()
+	config.SSTable.SavePath = path.Join(tmpDir, "sstable")
+	config.WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
-	util.GetConfig().TokenBucket.Interval = 1_000_000 // definitely long enough not to reset during the test
+	config.TokenBucket.Interval = 1_000_000 // definitely long enough not to reset during the test
 
-	db, err := NewKeyValueStore()
+	db, err := NewKeyValueStore(config)
 	if err != nil {
 		t.Fatalf("Failed to create key-value store: %v", err)
 	}
@@ -194,12 +198,13 @@ func TestKeyValueStore_PutRateLimitReached(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
+	config := util.GetConfig()
+	config.SSTable.SavePath = path.Join(tmpDir, "sstable")
+	config.WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
-	util.GetConfig().TokenBucket.Interval = 1_000_000 // definitely long enough not to reset during the test
+	config.TokenBucket.Interval = 1_000_000 // definitely long enough not to reset during the test
 
-	db, err := NewKeyValueStore()
+	db, err := NewKeyValueStore(config)
 	if err != nil {
 		t.Fatalf("Failed to create key-value store: %v", err)
 	}
@@ -229,12 +234,13 @@ func TestKeyValueStore_DeleteRateLimitReached(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
+	config := util.GetConfig()
+	config.SSTable.SavePath = path.Join(tmpDir, "sstable")
+	config.WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
-	util.GetConfig().TokenBucket.Interval = 1_000_000 // definitely long enough not to reset during the test
+	config.TokenBucket.Interval = 1_000_000 // definitely long enough not to reset during the test
 
-	db, err := NewKeyValueStore()
+	db, err := NewKeyValueStore(config)
 	if err != nil {
 		t.Fatalf("Failed to create key-value store: %v", err)
 	}
