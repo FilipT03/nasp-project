@@ -1,0 +1,39 @@
+package skip_list
+
+import (
+	"errors"
+	"nasp-project/structures/iterator"
+)
+
+type SkipListIter struct {
+	current *skipListNode
+}
+
+func (sl *SkipList) NewIterator() (iterator.Iterator, error) {
+	if sl.size == 0 {
+		return nil, errors.New("error: SkipList is empty")
+	}
+	starterNode := sl.head
+	height := sl.height
+
+	for height != 1 {
+		starterNode = starterNode.down
+		height--
+	}
+	return &SkipListIter{current: starterNode}, nil
+}
+
+func (iter *SkipListIter) Next() bool {
+	if iter.current.next != nil {
+		iter.current = iter.current.next
+		return true
+	}
+	return false
+}
+
+func (iter *SkipListIter) Value() []byte {
+	if iter.current != nil {
+		return iter.current.record.Key
+	}
+	return nil
+}
