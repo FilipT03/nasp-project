@@ -3,7 +3,7 @@ WAL:
     bufferSize: 8
 Memtable:
     maxSize: 1024
-    structure: SkipList
+    structure: SkipList # SkipList, HashMap, BTree
     instances: 1
     BTree:
         minSize: 16
