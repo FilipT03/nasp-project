@@ -23,10 +23,6 @@ type SkipList struct {
 	height    uint32        // height of the tallest column including the first
 }
 
-type SkipListIter struct {
-	current *skipListNode
-}
-
 // NewSkipList creates a new empty skip list of the specified size.
 func NewSkipList(maxSize uint32, maxHeight uint32) *SkipList {
 	head := skipListNode{}
@@ -266,30 +262,4 @@ func (sl *SkipList) searchForKey(key string) *skipListNode {
 
 func (sl *SkipList) IsFull() bool {
 	return sl.size == sl.maxSize
-}
-
-func (sl *SkipList) NewIterator() *SkipListIter {
-	starterNode := sl.head
-	height := sl.height
-
-	for height != 1 {
-		starterNode = starterNode.down
-		height--
-	}
-	return &SkipListIter{current: starterNode}
-}
-
-func (iter *SkipListIter) Next() bool {
-	if iter.current.next != nil {
-		iter.current = iter.current.next
-		return true
-	}
-	return false
-}
-
-func (iter *SkipListIter) Value() []byte {
-	if iter.current != nil {
-		return iter.current.record.Key
-	}
-	return nil
 }

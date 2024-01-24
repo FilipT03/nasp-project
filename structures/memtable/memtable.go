@@ -1,11 +1,13 @@
 package memtable
 
 import (
+	"bytes"
 	"errors"
 	"log"
 	"nasp-project/model"
 	"nasp-project/structures/b_tree"
 	"nasp-project/structures/hash_map"
+	"nasp-project/structures/iterator"
 	"nasp-project/structures/skip_list"
 	"nasp-project/util"
 )
@@ -17,6 +19,7 @@ type memtableStructure interface {
 	Flush() []model.Record
 	Clear()
 	IsFull() bool
+	NewIterator() (iterator.Iterator, error)
 }
 
 type Memtable struct {
@@ -28,11 +31,6 @@ type Memtables struct {
 	lastIndex    int
 	maxTables    int
 	tables       []*Memtable
-}
-
-type Iterator interface {
-	Next() bool
-	Value() []byte
 }
 
 // CreateMemtables creates instances of Memtable.
@@ -136,4 +134,46 @@ func (mts *Memtables) Flush() ([]model.Record, int) {
 	mts.tables[flushIdx].structure.Clear()
 	mts.lastIndex = (mts.lastIndex + 1) % mts.maxTables
 	return records, flushIdx
+}
+
+func (mts *Memtables) getIterators() []iterator.Iterator {
+	iterators := make([]iterator.Iterator, 0)
+	for i := 0; i < mts.maxTables; i++ {
+		mt := mts.tables[i]
+
+		if iter, err := mt.structure.NewIterator(); err == nil {
+			iterators = append(iterators, iter)
+		}
+	}
+	return iterators
+}
+
+func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Record {
+	iterators := mts.getIterators()
+	records := make([]*model.Record, 0)
+
+	// Set all iterators to minValue (or first value greater than minValue)
+	for i := 0; i < len(iterators); i++ {
+		current := iterators[i]
+		current.Next()
+		for bytes.Compare(current.Value(), minValue) < 0 {
+			if current.Next() || bytes.Compare(current.Value(), maxValue) > 0 {
+				// Delete iterator??
+				break
+			}
+		}
+	}
+
+	minRecordKey := iterators[0].Value()
+
+	for i := 1; i < len(iterators); i++ {
+		if bytes.Compare(minRecordKey, iterators[i].Value()) > 0 {
+			minRecordKey = iterators[i].Value()
+		}
+		if bytes.Compare(minRecordKey, iterators[i].Value()) == 0 {
+
+		}
+	}
+
+	return records
 }
