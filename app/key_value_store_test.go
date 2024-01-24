@@ -16,7 +16,7 @@ func TestNewKeyValueStore(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	//util.GetConfig().WAL.SavePath = path.Join(tmpDir, "wal")
+	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
 	db, err := NewKeyValueStore()
 	if err != nil {
@@ -73,7 +73,7 @@ func TestKeyValueStore_Get(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	//util.GetConfig().WAL.SavePath = path.Join(tmpDir, "wal")
+	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
 	db, err := NewKeyValueStore()
 	if err != nil {
@@ -106,7 +106,7 @@ func TestKeyValueStore_Get_NonExistentKey(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	//util.GetConfig().WAL.SavePath = path.Join(tmpDir, "wal")
+	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
 	db, err := NewKeyValueStore()
 	if err != nil {
@@ -133,7 +133,7 @@ func TestKeyValueStore_Delete(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	//util.GetConfig().WAL.SavePath = path.Join(tmpDir, "wal")
+	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
 	db, err := NewKeyValueStore()
 	if err != nil {
@@ -160,7 +160,7 @@ func TestKeyValueStore_GetRateLimitReached(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	//util.GetConfig().WAL.SavePath = path.Join(tmpDir, "wal")
+	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
 	util.GetConfig().TokenBucket.Interval = 1_000_000 // definitely long enough not to reset during the test
 
@@ -195,7 +195,7 @@ func TestKeyValueStore_PutRateLimitReached(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	//util.GetConfig().WAL.SavePath = path.Join(tmpDir, "wal")
+	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
 	util.GetConfig().TokenBucket.Interval = 1_000_000 // definitely long enough not to reset during the test
 
@@ -230,7 +230,7 @@ func TestKeyValueStore_DeleteRateLimitReached(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	util.GetConfig().SSTable.SavePath = path.Join(tmpDir, "sstable")
-	//util.GetConfig().WAL.SavePath = path.Join(tmpDir, "wal")
+	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
 
 	util.GetConfig().TokenBucket.Interval = 1_000_000 // definitely long enough not to reset during the test
 

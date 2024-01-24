@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-const ConfigPath = "config.yaml"
-
 type KeyValueStore struct {
 	config    *util.Config
 	wal       *writeaheadlog.WAL
@@ -22,10 +20,8 @@ type KeyValueStore struct {
 }
 
 // NewKeyValueStore creates an instance of Key-Value Storage engine with configuration given at ConfigPath.
-func NewKeyValueStore() (*KeyValueStore, error) {
-	config := util.LoadConfig(ConfigPath)
-
-	wal, err := writeaheadlog.NewWAL(config.WAL.BufferSize, config.WAL.SegmentSize)
+func NewKeyValueStore(config *util.Config) (*KeyValueStore, error) {
+	wal, err := writeaheadlog.NewWAL(config.WAL, config.Memtable.Instances)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +122,7 @@ func (kvs *KeyValueStore) put(key string, value []byte) error {
 	kvs.wal.PutCommit(key, value)
 
 	if kvs.memtables.IsFull() {
-		recs := kvs.memtables.Flush()
+		recs, flushedIdx := kvs.memtables.Flush()
 
 		_, err := sstable.CreateSSTable(recs, &kvs.config.SSTable)
 		if err != nil {
@@ -138,7 +134,10 @@ func (kvs *KeyValueStore) put(key string, value []byte) error {
 			return err
 		}
 
-		// TODO: Delete WAL records
+		err = kvs.wal.FlushedMemtable(flushedIdx)
+		if err != nil {
+			return err
+		}
 
 		for _, rec := range recs {
 			if kvs.cache.Get(string(rec.Key)) != nil {
