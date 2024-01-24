@@ -30,6 +30,11 @@ type Memtables struct {
 	tables       []*Memtable
 }
 
+type Iterator interface {
+	Next() bool
+	Value() []byte
+}
+
 // CreateMemtables creates instances of Memtable.
 // If the structure is invalid, it creates a Skip List.
 func CreateMemtables(config *util.MemtableConfig) *Memtables {
