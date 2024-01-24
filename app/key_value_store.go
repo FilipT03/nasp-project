@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-const ConfigPath = "config.yaml"
-
 type KeyValueStore struct {
 	config    *util.Config
 	wal       *writeaheadlog.WAL
@@ -22,9 +20,7 @@ type KeyValueStore struct {
 }
 
 // NewKeyValueStore creates an instance of Key-Value Storage engine with configuration given at ConfigPath.
-func NewKeyValueStore() (*KeyValueStore, error) {
-	config := util.LoadConfig(ConfigPath)
-
+func NewKeyValueStore(config *util.Config) (*KeyValueStore, error) {
 	wal, err := writeaheadlog.NewWAL(config.WAL, config.Memtable.Instances)
 	if err != nil {
 		return nil, err
