@@ -25,7 +25,7 @@ type KeyValueStore struct {
 func NewKeyValueStore() (*KeyValueStore, error) {
 	config := util.LoadConfig(ConfigPath)
 
-	wal, err := writeaheadlog.NewWAL(config.WAL.BufferSize, config.WAL.SegmentSize)
+	wal, err := writeaheadlog.NewWAL(config.WAL, config.Memtable.Instances)
 	if err != nil {
 		return nil, err
 	}
