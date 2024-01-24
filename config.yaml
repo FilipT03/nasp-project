@@ -1,6 +1,7 @@
 WAL:
     segmentSize: 32768
     bufferSize: 8
+    walFolderPath: ./wal
 Memtable:
     maxSize: 1024
     structure: SkipList # SkipList, HashMap, BTree
