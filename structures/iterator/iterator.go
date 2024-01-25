@@ -1,6 +1,8 @@
 package iterator
 
+import "nasp-project/model"
+
 type Iterator interface {
 	Next() bool
-	Value() []byte
+	Value() *model.Record
 }

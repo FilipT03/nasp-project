@@ -2,6 +2,7 @@ package skip_list
 
 import (
 	"errors"
+	"nasp-project/model"
 	"nasp-project/structures/iterator"
 )
 
@@ -28,12 +29,13 @@ func (iter *SkipListIter) Next() bool {
 		iter.current = iter.current.next
 		return true
 	}
+	iter.current = nil
 	return false
 }
 
-func (iter *SkipListIter) Value() []byte {
+func (iter *SkipListIter) Value() *model.Record {
 	if iter.current != nil {
-		return iter.current.record.Key
+		return iter.current.record
 	}
 	return nil
 }

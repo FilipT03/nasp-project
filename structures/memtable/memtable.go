@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"log"
+	"math"
 	"nasp-project/model"
 	"nasp-project/structures/b_tree"
 	"nasp-project/structures/hash_map"
@@ -155,24 +156,43 @@ func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Recor
 	for i := 0; i < len(iterators); i++ {
 		current := iterators[i]
 		current.Next()
-		for bytes.Compare(current.Value(), minValue) < 0 {
-			if current.Next() || bytes.Compare(current.Value(), maxValue) > 0 {
-				// Delete iterator??
+
+		for bytes.Compare(current.Value().Key, minValue) < 0 {
+			if !current.Next() {
 				break
 			}
 		}
 	}
 
-	minRecordKey := iterators[0].Value()
+	seenValues := make(map[string]bool)
+	for {
+		minIndex := -1
+		minKey := []byte{255}
+		minTimestamp := uint64(math.MaxUint64)
 
-	for i := 1; i < len(iterators); i++ {
-		if bytes.Compare(minRecordKey, iterators[i].Value()) > 0 {
-			minRecordKey = iterators[i].Value()
+		for i, iter := range iterators {
+			if iter != nil && iter.Value() != nil && (bytes.Compare(iter.Value().Key, minKey) < 0 ||
+				(bytes.Equal(iter.Value().Key, minKey) && iter.Value().Timestamp < minTimestamp)) {
+				minIndex = i
+				minKey = iter.Value().Key
+				minTimestamp = iter.Value().Timestamp
+			}
 		}
-		if bytes.Compare(minRecordKey, iterators[i].Value()) == 0 {
+		if minIndex == -1 {
+			break
+		}
+		if !seenValues[string(minKey)] {
+			if bytes.Compare(iterators[minIndex].Value().Key, maxValue) > 0 {
+				iterators[minIndex] = nil
+				continue
+			}
+			records = append(records, iterators[minIndex].Value())
+			seenValues[string(minKey)] = true
+		}
 
+		if !iterators[minIndex].Next() || bytes.Compare(iterators[minIndex].Value().Key, maxValue) > 0 {
+			iterators[minIndex] = nil
 		}
 	}
-
 	return records
 }
