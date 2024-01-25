@@ -32,18 +32,17 @@ func (hm *HashMap) NewIterator() (iterator.Iterator, error) {
 }
 
 func (h *HashMapIter) Next() bool {
-	if h.index+1 < h.maxIndex {
-		h.index += 1
-		return true
-	}
-	return false
+	h.index += 1
+	return h.index < h.maxIndex
 }
 
 func (h *HashMapIter) Value() *model.Record {
-	value, err := h.hashMap.Get([]byte(h.keys[h.index]))
-	if err != nil {
-		return nil
+	if h.index < h.maxIndex {
+		value, err := h.hashMap.Get([]byte(h.keys[h.index]))
+		if err != nil {
+			return nil
+		}
+		return value
 	}
-
-	return value
+	return nil
 }

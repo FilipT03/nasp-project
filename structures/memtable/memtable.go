@@ -155,7 +155,6 @@ func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Recor
 	// Set all iterators to minValue (or first value greater than minValue)
 	for i := 0; i < len(iterators); i++ {
 		current := iterators[i]
-		current.Next()
 
 		for bytes.Compare(current.Value().Key, minValue) < 0 {
 			if !current.Next() {

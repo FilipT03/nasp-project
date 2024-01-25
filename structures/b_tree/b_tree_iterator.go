@@ -13,11 +13,8 @@ type BTreeIter struct {
 }
 
 func (b *BTreeIter) Next() bool {
-	if b.index+1 < b.maxIndex {
-		b.index += 1
-		return true
-	}
-	return false
+	b.index += 1
+	return b.index < b.maxIndex
 }
 
 func (b *BTreeIter) Value() *model.Record {
