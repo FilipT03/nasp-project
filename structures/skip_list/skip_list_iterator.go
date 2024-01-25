@@ -21,7 +21,7 @@ func (sl *SkipList) NewIterator() (iterator.Iterator, error) {
 		starterNode = starterNode.down
 		height--
 	}
-	return &SkipListIter{current: starterNode}, nil
+	return &SkipListIter{current: starterNode.next}, nil
 }
 
 func (iter *SkipListIter) Next() bool {
