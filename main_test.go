@@ -24,6 +24,7 @@ var NUM_RECORDS = 100000
 var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 // charset used for generating random keys and values.
+
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 // BenchmarkInsert100 the insertion of 100000 records with 100 keys.
@@ -41,8 +42,10 @@ func BenchmarkInsert100(b *testing.B) {
 	config := util.GetConfig()
 	config.SSTable.SavePath = tmpDir
 	config.SSTable.Compression = false
-	// set memtable size to 50 because I insert only 100 records
+	// set memtable size to 50 because I insert only 100 different keys
 	config.Memtable.MaxSize = 50
+	// set token bucket to 1000 because I insert only 100000 records
+	config.TokenBucket.MaxTokenSize = 100000
 	filepath := config.SSTable.SavePath
 	levels := config.LSMTree.MaxLevel
 
@@ -57,7 +60,10 @@ func BenchmarkInsert100(b *testing.B) {
 
 	// put elements in the key value store
 	for i := 0; i < NUM_RECORDS; i++ {
-		kvs.Put(keys[randomIdx(100)], generateNewValue())
+		err := kvs.Put(keys[randomIdx(100)], generateNewValue())
+		if err != nil {
+			b.Error(err)
+		}
 	}
 	// go through all the levels and count the occupied space
 	// for each level by summing the size of the SSTables
@@ -92,8 +98,10 @@ func BenchmarkInsertWithCompression100(b *testing.B) {
 	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
 	config := util.GetConfig()
 	config.SSTable.Compression = true
-	// set memtable size to 50 because I insert only 100 records
+	// set memtable size to 50 because I insert only 100 different keys
 	config.Memtable.MaxSize = 50
+	// set token bucket to 1000 because I insert only 100000 records
+	config.TokenBucket.MaxTokenSize = 100000
 	// count disc space
 	// create n random keys
 	keys := generateKey(100)
@@ -105,7 +113,10 @@ func BenchmarkInsertWithCompression100(b *testing.B) {
 
 	// put elements
 	for i := 0; i < NUM_RECORDS; i++ {
-		kvs.Put(keys[randomIdx(100)], generateNewValue())
+		err := kvs.Put(keys[randomIdx(100)], generateNewValue())
+		if err != nil {
+			b.Error(err)
+		}
 	}
 	for i := 1; i <= levels; i++ {
 		pathToToc := filepath + "/L" + fmt.Sprintf("%03d", i) + "/TOC"
@@ -134,8 +145,9 @@ func BenchmarkInsertWithCompression50000(b *testing.B) {
 	util.GetConfig().SSTable.SavePath = tmpDir
 	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
 	config := util.GetConfig()
-	config.Memtable.MaxSize = 50
 	config.SSTable.Compression = true
+	// set token bucket to 100000 because I insert only 100000 records
+	config.TokenBucket.MaxTokenSize = 100000
 	// count disc space
 	// create n random keys
 	keys := generateKey(50000)
@@ -147,7 +159,10 @@ func BenchmarkInsertWithCompression50000(b *testing.B) {
 
 	// put elements
 	for i := 0; i < NUM_RECORDS; i++ {
-		kvs.Put(keys[randomIdx(50000)], generateNewValue())
+		err := kvs.Put(keys[randomIdx(50000)], generateNewValue())
+		if err != nil {
+			b.Error(err)
+		}
 	}
 	for i := 1; i <= levels; i++ {
 		pathToToc := filepath + "/L" + fmt.Sprintf("%03d", i) + "/TOC"
@@ -177,7 +192,8 @@ func BenchmarkInsert50000(b *testing.B) {
 	util.GetConfig().WAL.WALFolderPath = path.Join(tmpDir, "wal")
 	config := util.GetConfig()
 	config.SSTable.Compression = false
-	config.Memtable.MaxSize = 50
+	// set token bucket to 100000 because I insert only 100000 records
+	config.TokenBucket.MaxTokenSize = 100000
 	// count disc space
 	// create n random keys
 	keys := generateKey(50000)
@@ -189,7 +205,10 @@ func BenchmarkInsert50000(b *testing.B) {
 
 	// put elements
 	for i := 0; i < NUM_RECORDS; i++ {
-		kvs.Put(keys[randomIdx(50000)], generateNewValue())
+		err := kvs.Put(keys[randomIdx(50000)], generateNewValue())
+		if err != nil {
+			b.Error(err)
+		}
 	}
 	for i := 1; i <= levels; i++ {
 		pathToToc := filepath + "/L" + fmt.Sprintf("%03d", i) + "/TOC"
