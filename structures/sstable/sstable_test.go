@@ -494,3 +494,193 @@ func TestMergeSSTablesSameKey(t *testing.T) {
 		t.Errorf("Expected value of 'value2', got %v", dr.Value)
 	}
 }
+
+func TestMergeMultipleSSTables(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "sstable_test_")
+	if err != nil {
+		t.Fatalf("Failed to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	config := util.SSTableConfig{
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
+	}
+
+	// Create some sample data records.
+	recs1 := []model.Record{
+		{Key: []byte("key1"), Value: []byte("value1"), Timestamp: 1},
+		{Key: []byte("key2"), Value: []byte("value2"), Timestamp: 2},
+	}
+
+	recs2 := []model.Record{
+		{Key: []byte("key3"), Value: []byte("value3"), Timestamp: 3},
+		{Key: []byte("key4"), Value: []byte("value4"), Timestamp: 4},
+	}
+
+	recs3 := []model.Record{
+		{Key: []byte("key5"), Value: []byte("value5"), Timestamp: 5},
+		{Key: []byte("key6"), Value: []byte("value6"), Timestamp: 6},
+	}
+
+	recs4 := []model.Record{
+		{Key: []byte("key7"), Value: []byte("value7"), Timestamp: 7},
+		{Key: []byte("key8"), Value: []byte("value8"), Timestamp: 8},
+	}
+
+	// Create four SSTables.
+	sstable1, err := CreateSSTable(recs1, config)
+	if err != nil {
+		t.Errorf("Failed to create SSTable: %v", err)
+	}
+
+	sstable2, err := CreateSSTable(recs2, config)
+	if err != nil {
+		t.Errorf("Failed to create SSTable: %v", err)
+	}
+
+	sstable3, err := CreateSSTable(recs3, config)
+	if err != nil {
+		t.Errorf("Failed to create SSTable: %v", err)
+	}
+
+	sstable4, err := CreateSSTable(recs4, config)
+	if err != nil {
+		t.Errorf("Failed to create SSTable: %v", err)
+	}
+
+	// Merge the SSTables.
+	merged, err := MergeMultipleSSTables([]*SSTable{sstable1, sstable2, sstable3, sstable4}, 2, &config)
+	if err != nil {
+		t.Errorf("Failed to merge SSTables: %v", err)
+	}
+
+	// Check that the merged SSTable is correct.
+	dr, err := merged.Read([]byte("key1"))
+	if err != nil {
+		t.Errorf("Failed to read record: %v", err)
+	}
+
+	if bytes.Compare(dr.Value, []byte("value1")) != 0 {
+		t.Errorf("Expected value of 'value1', got %v", dr.Value)
+	}
+
+	dr, err = merged.Read([]byte("key5"))
+	if err != nil {
+		t.Errorf("Failed to read record: %v", err)
+	}
+	if bytes.Compare(dr.Value, []byte("value5")) != 0 {
+		t.Errorf("Expected value of 'value5', got %v", dr.Value)
+	}
+}
+
+func TestSSTable_Rename(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "sstable_test_")
+	if err != nil {
+		t.Fatalf("Failed to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	config := util.SSTableConfig{
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
+	}
+
+	// Create some sample data records.
+	recs1 := []model.Record{
+		{Key: []byte("key1"), Value: []byte("value1"), Timestamp: 1},
+		{Key: []byte("key2"), Value: []byte("value2"), Timestamp: 2},
+	}
+
+	// Create an SSTable.
+	sstable, err := CreateSSTable(recs1, config)
+	if err != nil {
+		t.Errorf("Failed to create SSTable: %v", err)
+	}
+
+	// Rename the SSTable.
+	err = sstable.Rename(2)
+	if err != nil {
+		t.Errorf("Failed to rename SSTable: %v", err)
+	}
+
+	// Check that the files were renamed.
+	_, err = os.Stat(filepath.Join(tmpDir, "L001", "TOC", "usertable-00002-TOC.txt"))
+	if err != nil {
+		t.Errorf("Expected TOC file to be renamed.")
+	}
+
+	_, err = os.Stat(filepath.Join(tmpDir, "L001", "usertable-00002-Data.db"))
+	if err != nil {
+		t.Errorf("Expected data file to be renamed.")
+	}
+
+	_, err = os.Stat(filepath.Join(tmpDir, "L001", "usertable-00002-Index.db"))
+	if err != nil {
+		t.Errorf("Expected index file to be renamed.")
+	}
+
+	_, err = os.Stat(filepath.Join(tmpDir, "L001", "usertable-00002-Summary.db"))
+	if err != nil {
+		t.Errorf("Expected summary file to be renamed.")
+	}
+
+	_, err = os.Stat(filepath.Join(tmpDir, "L001", "usertable-00002-Filter.db"))
+	if err != nil {
+		t.Errorf("Expected filter file to be renamed.")
+	}
+
+	_, err = os.Stat(filepath.Join(tmpDir, "L001", "usertable-00002-Metadata.txt"))
+	if err != nil {
+		t.Errorf("Expected metadata file to be renamed.")
+	}
+
+	sameTable, err := OpenSSTableFromToc(filepath.Join(tmpDir, "L001", "TOC", "usertable-00002-TOC.txt"))
+	if err != nil {
+		t.Fatalf("Failed to open SSTable: %v", err)
+	}
+
+	if sameTable.Data.Filename != sstable.Data.Filename {
+		t.Errorf("Expected data filenames to be equal.")
+	}
+
+	if sameTable.Index.Filename != sstable.Index.Filename {
+		t.Errorf("Expected index filenames to be equal.")
+	}
+
+	if sameTable.Summary.Filename != sstable.Summary.Filename {
+		t.Errorf("Expected summary filenames to be equal.")
+	}
+
+	if sameTable.Filter.Filename != sstable.Filter.Filename {
+		t.Errorf("Expected filter filenames to be equal.")
+	}
+
+	if sameTable.MetadataFilename != sstable.MetadataFilename {
+		t.Errorf("Expected metadata filenames to be equal.")
+	}
+
+	dr, err := sameTable.Read([]byte("key1"))
+	if err != nil {
+		t.Errorf("Failed to read record: %v", err)
+	}
+	if bytes.Compare(dr.Value, []byte("value1")) != 0 {
+		t.Errorf("Expected value of 'value1', got %v", dr.Value)
+	}
+
+	dr, err = sameTable.Read([]byte("key2"))
+	if err != nil {
+		t.Errorf("Failed to read record: %v", err)
+	}
+	if bytes.Compare(dr.Value, []byte("value2")) != 0 {
+		t.Errorf("Expected value of 'value2', got %v", dr.Value)
+	}
+}
