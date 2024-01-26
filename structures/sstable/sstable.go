@@ -2,6 +2,7 @@ package sstable
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"nasp-project/model"
 	"nasp-project/structures/merkle_tree"
@@ -24,10 +25,11 @@ type SSTable struct {
 func initializeSSTable(level int, config util.SSTableConfig) (*SSTable, error) {
 	path := filepath.Join(config.SavePath, fmt.Sprintf("L%03d", level))
 
-	label, err := getNextSStableLabel(filepath.Join(path, "TOC"))
+	labelNum, err := GetNextSStableLabel(filepath.Join(path, "TOC"))
 	if err != nil {
 		return nil, err
 	}
+	label := fmt.Sprintf("%05d", labelNum)
 
 	var sstable *SSTable = nil
 
@@ -183,18 +185,18 @@ func (sst *SSTable) toBinaryFiles() []util.BinaryFile {
 	}
 }
 
-// getNextSStableLabel finds the largest label number in the given path and returns the next label number.
-func getNextSStableLabel(path string) (string, error) {
+// GetNextSStableLabel finds the largest label number in the given path and returns the next label number.
+func GetNextSStableLabel(path string) (int, error) {
 	// ReadDir if exists. if not, create and read
 	folder, err := os.ReadDir(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			err = os.MkdirAll(path, 0755)
 			if err != nil {
-				return "", err
+				return 0, err
 			}
 		} else {
-			return "", err
+			return 0, err
 		}
 	}
 
@@ -209,7 +211,7 @@ func getNextSStableLabel(path string) (string, error) {
 		if match != nil {
 			label, err := strconv.Atoi(match[1])
 			if err != nil {
-				return "", err
+				return 0, err
 			}
 			if label > maxNum {
 				maxNum = label
@@ -217,7 +219,7 @@ func getNextSStableLabel(path string) (string, error) {
 		}
 	}
 
-	return fmt.Sprintf("%05d", maxNum+1), nil
+	return maxNum + 1, nil
 }
 
 // createFiles creates empty files for the SSTable on disk.
@@ -341,6 +343,89 @@ func (sst *SSTable) writeTOCFile() error {
 	}
 
 	_, err = file.WriteString(sst.MetadataFilename + "\n")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Rename renames all SSTable files with the new label number.
+// This modifies the position of the SSTable withing the same level of the LSM Tree.
+func (sst *SSTable) Rename(label int) error {
+	re := regexp.MustCompile(`.*usertable-(\d+)-TOC.txt`)
+	match := re.FindStringSubmatch(sst.TOCFilename)
+	if match != nil {
+		_, err := strconv.Atoi(match[1])
+		if err != nil {
+			return err
+		}
+		prefix := match[0][:len(match[0])-len(match[1])-18] // 18 is the length of "usertable--TOC.txt"
+		newPath := fmt.Sprintf("%susertable-%05d-TOC.txt", prefix, label)
+		err = os.Rename(sst.TOCFilename, newPath)
+		if err != nil {
+			return err
+		}
+		sst.TOCFilename = newPath
+	} else {
+		return errors.New("malformed sstable")
+	}
+
+	// rename all other filenames
+	re = regexp.MustCompile(`.*usertable-(\d+)-Metadata.txt`)
+	match = re.FindStringSubmatch(sst.MetadataFilename)
+	if match == nil {
+		return errors.New("malformed sstable")
+	}
+	prefix := match[0][:len(match[0])-len(match[1])-23] // 23 is the length of "usertable--Metadata.txt"
+
+	singleFile := sst.Data.Filename == sst.Index.Filename
+	var newDataFilename, newIndexFilename, newSummaryFilename, newFilterFilename string
+	if singleFile {
+		newDataFilename = fmt.Sprintf("%susertable-%05d-SSTable.db", prefix, label)
+		newIndexFilename = fmt.Sprintf("%susertable-%05d-SSTable.db", prefix, label)
+		newSummaryFilename = fmt.Sprintf("%susertable-%05d-SSTable.db", prefix, label)
+		newFilterFilename = fmt.Sprintf("%susertable-%05d-SSTable.db", prefix, label)
+	} else {
+		newDataFilename = fmt.Sprintf("%susertable-%05d-Data.db", prefix, label)
+		newIndexFilename = fmt.Sprintf("%susertable-%05d-Index.db", prefix, label)
+		newSummaryFilename = fmt.Sprintf("%susertable-%05d-Summary.db", prefix, label)
+		newFilterFilename = fmt.Sprintf("%susertable-%05d-Filter.db", prefix, label)
+	}
+	newMetadataFilename := fmt.Sprintf("%susertable-%05d-Metadata.txt", prefix, label)
+
+	err := os.Rename(sst.Data.Filename, newDataFilename)
+	if err != nil {
+		return err
+	}
+	sst.Data.Filename = newDataFilename
+
+	err = os.Rename(sst.Index.Filename, newIndexFilename)
+	if err != nil {
+		return err
+	}
+	sst.Index.Filename = newIndexFilename
+
+	err = os.Rename(sst.Summary.Filename, newSummaryFilename)
+	if err != nil {
+		return err
+	}
+	sst.Summary.Filename = newSummaryFilename
+
+	err = os.Rename(sst.Filter.Filename, newFilterFilename)
+	if err != nil {
+		return err
+	}
+	sst.Filter.Filename = newFilterFilename
+
+	err = os.Rename(sst.MetadataFilename, newMetadataFilename)
+	if err != nil {
+		return err
+	}
+	sst.MetadataFilename = newMetadataFilename
+
+	// write new toc file
+	err = sst.writeTOCFile()
 	if err != nil {
 		return err
 	}
@@ -480,69 +565,48 @@ func (sst *SSTable) Read(key []byte) (*model.Record, error) {
 	}, nil
 }
 
-// MergeSSTables merges the given SSTables and writes the result to disk.
-// Removes the input SSTables from disk.
-// Returns the new SSTable.
-// Returns an error if the merge fails.
-func MergeSSTables(sst1, sst2 *SSTable, level int, config util.SSTableConfig) (*SSTable, error) {
-	sstable, err := initializeSSTable(level, config)
-	if err != nil {
-		return nil, err
+func (sst *SSTable) BuildFromDataBlock(numRecords uint, config *util.SSTableConfig) error {
+	if config.SingleFile {
+		sst.Index.StartOffset = sst.Data.StartOffset + sst.Data.Size
 	}
-
-	numRecords, err := sstable.Data.WriteMerged(&sst1.Data, &sst2.Data)
+	err := sst.Index.CreateFromDataBlock(config.IndexDegree, &sst.Data)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if config.SingleFile {
-		sstable.Index.StartOffset = sstable.Data.StartOffset + sstable.Data.Size
+		sst.Summary.StartOffset = sst.Index.StartOffset + sst.Index.Size
 	}
-	err = sstable.Index.CreateFromDataBlock(config.IndexDegree, &sstable.Data)
+	err = sst.Summary.CreateFromIndexBlock(config.SummaryDegree, &sst.Index)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if config.SingleFile {
-		sstable.Summary.StartOffset = sstable.Index.StartOffset + sstable.Index.Size
+		sst.Filter.StartOffset = sst.Summary.StartOffset + sst.Summary.Size
 	}
-	err = sstable.Summary.CreateFromIndexBlock(config.SummaryDegree, &sstable.Index)
+	err = sst.Filter.CreateFromDataBlock(numRecords, config.FilterPrecision, &sst.Data)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	err = sst.Filter.Write()
+	if err != nil {
+		return err
+	}
+	sst.Filter.Filter = nil
 
-	if config.SingleFile {
-		sstable.Filter.StartOffset = sstable.Summary.StartOffset + sstable.Summary.Size
-	}
-	err = sstable.Filter.CreateFromDataBlock(numRecords, config.FilterPrecision, &sstable.Data)
-	if err != nil {
-		return nil, err
-	}
-	err = sstable.Filter.Write()
-	if err != nil {
-		return nil, err
-	}
-	sstable.Filter.Filter = nil
-
-	files := sstable.toBinaryFiles()
+	files := sst.toBinaryFiles()
 	merkleTree := merkle_tree.NewMerkleTree(files, config.MerkleTreeChunkSize)
-	file, err := os.Create(sstable.MetadataFilename)
+	file, err := os.Create(sst.MetadataFilename)
 	_, err = file.WriteString(merkleTree.Serialize())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = sstable.writeTOCFile()
-
-	err = sst1.deleteFiles()
+	err = sst.writeTOCFile()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = sst2.deleteFiles()
-	if err != nil {
-		return nil, err
-	}
-
-	return sstable, nil
+	return nil
 }
