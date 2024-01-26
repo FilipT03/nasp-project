@@ -192,6 +192,74 @@ func (db *DataBlock) writeRecord(file *os.File, rec *DataRecord, compressionDict
 	return nil
 }
 
+// writeRecordLen writes a record to the data block file and returns the number of bytes written.
+func (db *DataBlock) writeRecordLen(file *os.File, rec *DataRecord) (int, error) {
+	size := 0
+
+	bytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(bytes, rec.CRC)
+	_, err := file.Write(bytes)
+	if err != nil {
+		return size, err
+	}
+	size += 4
+
+	bytes = make([]byte, 8)
+	binary.LittleEndian.PutUint64(bytes, rec.Timestamp)
+	_, err = file.Write(bytes)
+	if err != nil {
+		return size, err
+	}
+	size += 8
+
+	if rec.Tombstone {
+		_, err = file.Write([]byte{1})
+		if err != nil {
+			return size, err
+		}
+	} else {
+		_, err = file.Write([]byte{0})
+		if err != nil {
+			return size, err
+		}
+	}
+	size += 1
+
+	bytes = make([]byte, 8)
+	binary.LittleEndian.PutUint64(bytes, uint64(len(rec.Key)))
+	_, err = file.Write(bytes)
+	if err != nil {
+		return size, err
+	}
+	size += 8
+
+	if !rec.Tombstone {
+		bytes = make([]byte, 8)
+		binary.LittleEndian.PutUint64(bytes, uint64(len(rec.Value)))
+		_, err = file.Write(bytes)
+		if err != nil {
+			return size, err
+		}
+		size += 8
+	}
+
+	_, err = file.Write(rec.Key)
+	if err != nil {
+		return size, err
+	}
+	size += len(rec.Key)
+
+	if !rec.Tombstone {
+		_, err = file.Write(rec.Value)
+		if err != nil {
+			return size, err
+		}
+		size += len(rec.Value)
+	}
+
+	return size, nil
+}
+
 // isEndOfBlock return true if file pointer is positioned at the end of the given data block.
 func (db *DataBlock) isEndOfBlock(file *os.File) (bool, error) {
 	pos, err := file.Seek(0, 1)
