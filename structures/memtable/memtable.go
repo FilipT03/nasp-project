@@ -7,7 +7,6 @@ import (
 	"nasp-project/model"
 	"nasp-project/structures/b_tree"
 	"nasp-project/structures/hash_map"
-	"nasp-project/structures/iterator"
 	"nasp-project/structures/skip_list"
 	"nasp-project/util"
 )
@@ -19,7 +18,7 @@ type memtableStructure interface {
 	Flush() []model.Record
 	Clear()
 	IsFull() bool
-	NewIterator() (iterator.Iterator, error)
+	NewIterator() (util.Iterator, error)
 }
 
 type Memtable struct {
@@ -135,8 +134,8 @@ func (mts *Memtables) Flush() []model.Record {
 	return records
 }
 
-func (mts *Memtables) getIterators() []iterator.Iterator {
-	iterators := make([]iterator.Iterator, 0)
+func (mts *Memtables) getIterators() []util.Iterator {
+	iterators := make([]util.Iterator, 0)
 	for i := 0; i < mts.maxTables; i++ {
 		mt := mts.tables[i]
 
@@ -196,4 +195,8 @@ func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Recor
 		}
 	}
 	return records
+}
+
+func (mts *Memtables) PrefixScan(prefix string) []*model.Record {
+	panic("TODO - Implement prefix scan")
 }

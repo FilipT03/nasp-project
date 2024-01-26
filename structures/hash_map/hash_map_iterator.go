@@ -3,7 +3,7 @@ package hash_map
 import (
 	"errors"
 	"nasp-project/model"
-	"nasp-project/structures/iterator"
+	"nasp-project/util"
 	"sort"
 )
 
@@ -14,7 +14,7 @@ type HashMapIter struct {
 	maxIndex int
 }
 
-func (hm *HashMap) NewIterator() (iterator.Iterator, error) {
+func (hm *HashMap) NewIterator() (util.Iterator, error) {
 	if len(hm.data) == 0 {
 		return nil, errors.New("error: hashmap is empty")
 	}

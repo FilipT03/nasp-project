@@ -1,4 +1,4 @@
-package iterator
+package util
 
 import "nasp-project/model"
 
