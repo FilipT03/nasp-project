@@ -38,6 +38,10 @@ func MergeSSTables(sst1, sst2 *SSTable, level int, config util.SSTableConfig) (*
 	return sstable, nil
 }
 
+// MergeMultipleSSTables merges the given SSTables and writes the result to disk.
+// Removes the input SSTables from disk.
+// Returns the list of newly created SSTables.
+// Returns an error if the merge fails.
 func MergeMultipleSSTables(tables []*SSTable, level int, config *util.SSTableConfig) (*SSTable, error) {
 	if len(tables) < 1 {
 		return nil, errors.New("no tables to merge")
@@ -45,7 +49,7 @@ func MergeMultipleSSTables(tables []*SSTable, level int, config *util.SSTableCon
 	var numRecs uint
 	for len(tables) > 1 {
 		var newTables []*SSTable
-		for i := 0; i < len(tables); i += 2 {
+		for i := 0; i+1 < len(tables); i += 2 {
 			newTable, err := initializeSSTable(level, *config)
 			if err != nil {
 				return nil, err
@@ -65,6 +69,9 @@ func MergeMultipleSSTables(tables []*SSTable, level int, config *util.SSTableCon
 			if err != nil {
 				return nil, err
 			}
+		}
+		if len(tables)%2 != 0 {
+			newTables = append(newTables, tables[len(tables)-1])
 		}
 		tables = newTables
 	}

@@ -576,6 +576,14 @@ func TestMergeMultipleSSTables(t *testing.T) {
 	if bytes.Compare(dr.Value, []byte("value5")) != 0 {
 		t.Errorf("Expected value of 'value5', got %v", dr.Value)
 	}
+
+	dr, err = merged.Read([]byte("key7"))
+	if err != nil {
+		t.Errorf("Failed to read record: %v", err)
+	}
+	if bytes.Compare(dr.Value, []byte("value7")) != 0 {
+		t.Errorf("Expected value of 'value5', got %v", dr.Value)
+	}
 }
 
 func TestSSTable_Rename(t *testing.T) {
