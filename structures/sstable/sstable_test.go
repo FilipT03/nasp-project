@@ -726,7 +726,7 @@ func TestDataRecordGenerator(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	config := util.SSTableConfig{
+	config := &util.SSTableConfig{
 		SavePath:            tmpDir,
 		SingleFile:          false,
 		IndexDegree:         2,
@@ -746,17 +746,17 @@ func TestDataRecordGenerator(t *testing.T) {
 	}
 
 	// Create SSTables.
-	table1, err := CreateSSTable(recs1, config)
+	table1, err := CreateSSTable(recs1, nil, config)
 	if err != nil {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
-	table2, err := CreateSSTable(recs2, config)
+	table2, err := CreateSSTable(recs2, nil, config)
 	if err != nil {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
 
 	// Create a data record generator.
-	gen, err := NewDataRecordGenerator([]*DataBlock{&table1.Data, &table2.Data})
+	gen, err := NewDataRecordGenerator([]*DataBlock{&table1.Data, &table2.Data}, nil)
 	if err != nil {
 		t.Errorf("Failed to create data record generator: %v", err)
 	}
