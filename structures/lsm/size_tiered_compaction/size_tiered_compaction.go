@@ -3,12 +3,13 @@ package size_tiered_compaction
 import (
 	"fmt"
 	"io/ioutil"
+	"nasp-project/structures/compression"
 	"nasp-project/structures/sstable"
 	"nasp-project/util"
 )
 
 // Compact performs compaction on the LSM tree.
-func Compact(sstableConfig *util.SSTableConfig, lsmConfig *util.LSMTreeConfig) {
+func Compact(compressionDict *compression.Dictionary, sstableConfig *util.SSTableConfig, lsmConfig *util.LSMTreeConfig) {
 	// maximum number of levels in the LSM tree
 	maxLsmLevel := lsmConfig.MaxLevel
 	// maximum number of SSTables in each level of the LSM Tree
@@ -60,7 +61,7 @@ func Compact(sstableConfig *util.SSTableConfig, lsmConfig *util.LSMTreeConfig) {
 				return
 			}
 			// merge the two SSTables and save the result in the next level
-			_, err = sstable.MergeSSTables(sstable1, sstable2, level+1, sstableConfig)
+			_, err = sstable.MergeSSTables(sstable1, sstable2, level+1, sstableConfig, compressionDict)
 			if err != nil {
 				fmt.Println("Error merging sstables")
 				return

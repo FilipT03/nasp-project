@@ -3,6 +3,7 @@ package sstable
 import (
 	"bytes"
 	"encoding/binary"
+	"nasp-project/structures/compression"
 	"nasp-project/util"
 	"os"
 )
@@ -29,8 +30,11 @@ type IndexBlock struct {
 	util.BinaryFile // Only file block because nothing is ever loaded into memory
 }
 
-func (ir *IndexRecord) sizeOnDisk() int {
+func (ir *IndexRecord) sizeOnDisk(compressionDict *compression.Dictionary) int {
 	buf := make([]byte, binary.MaxVarintLen64)
+	if compressionDict != nil {
+		return binary.PutUvarint(buf, uint64(compressionDict.GetIdx(ir.Key))) + binary.PutUvarint(buf, uint64(ir.Offset))
+	}
 	return binary.PutUvarint(buf, uint64(len(ir.Key))) + len(ir.Key) + binary.PutUvarint(buf, uint64(ir.Offset))
 }
 
@@ -38,7 +42,7 @@ func (ir *IndexRecord) sizeOnDisk() int {
 // It also sets the size of the index block.
 // sparseDeg is the number of records to skip before adding the next record.
 // First and last records are always added.
-func (ib *IndexBlock) CreateFromDataBlock(sparseDeg int, db *DataBlock) error {
+func (ib *IndexBlock) CreateFromDataBlock(sparseDeg int, db *DataBlock, compressionDict *compression.Dictionary) error {
 	file, err := os.OpenFile(ib.Filename, os.O_WRONLY, 0644)
 	if err != nil {
 		return err
@@ -87,11 +91,14 @@ func (ib *IndexBlock) CreateFromDataBlock(sparseDeg int, db *DataBlock) error {
 		}
 		recSize += 1
 
-		keySize, n, err := util.ReadUvarintLen(dbFile)
-		if err != nil {
-			return err
+		var keySize uint64 // only if compression is turned off
+		if compressionDict == nil {
+			keySize, err = util.ReadUvarint(file)
+			if err != nil {
+				return err
+			}
+			recSize += int64(n)
 		}
-		recSize += int64(n)
 
 		var valueSize uint64 = 0
 		if tombstone[0] == 0 {
@@ -102,15 +109,24 @@ func (ib *IndexBlock) CreateFromDataBlock(sparseDeg int, db *DataBlock) error {
 			recSize += int64(n)
 		}
 
-		key := make([]byte, keySize)
-		rl, err = dbFile.Read(key)
-		if rl != len(key) {
-			break
+		var key []byte
+		if compressionDict == nil {
+			// compression is off, read the key as-is
+			key = make([]byte, keySize)
+			_, err = file.Read(key)
+			if err != nil {
+				return err
+			}
+			recSize += int64(keySize)
+		} else {
+			// compression is on, get the key from compression dictionary
+			keyIdx, n, err := util.ReadUvarintLen(file)
+			if err != nil {
+				return err
+			}
+			key = compressionDict.GetKey(int(keyIdx))
+			recSize += int64(n)
 		}
-		if err != nil {
-			return err
-		}
-		recSize += int64(keySize)
 
 		offset, err = dbFile.Seek(int64(valueSize), 1)
 		if err != nil {
@@ -123,7 +139,7 @@ func (ib *IndexBlock) CreateFromDataBlock(sparseDeg int, db *DataBlock) error {
 
 		if cnt%sparseDeg == 0 || last { // add every sparseDeg-th record and the last record
 			offset -= recSize
-			err = ib.writeRecord(file, IndexRecord{key, offset})
+			err = ib.writeRecord(file, IndexRecord{key, offset}, compressionDict)
 			if err != nil {
 				return err
 			}
@@ -142,7 +158,7 @@ func (ib *IndexBlock) CreateFromDataBlock(sparseDeg int, db *DataBlock) error {
 // It also sets the size of the index block.
 // sparseDeg is the number of records to skip before adding the next record.
 // First and last records are always added.
-func (ib *IndexBlock) CreateFromDataRecords(sparseDeg int, recs []DataRecord) ([]IndexRecord, error) {
+func (ib *IndexBlock) CreateFromDataRecords(sparseDeg int, recs []DataRecord, compressionDict *compression.Dictionary) ([]IndexRecord, error) {
 	file, err := os.OpenFile(ib.Filename, os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, err
@@ -160,13 +176,13 @@ func (ib *IndexBlock) CreateFromDataRecords(sparseDeg int, recs []DataRecord) ([
 	for cnt, rec := range recs {
 		if cnt%sparseDeg == 0 || cnt == len(recs)-1 { // add every sparseDeg-th record and the last record
 			ir := IndexRecord{rec.Key, offset}
-			err = ib.writeRecord(file, ir)
+			err = ib.writeRecord(file, ir, compressionDict)
 			if err != nil {
 				return idxRecs, err
 			}
 			idxRecs = append(idxRecs, ir)
 		}
-		offset += int64(rec.sizeOnDisk())
+		offset += int64(rec.sizeOnDisk(compressionDict))
 	}
 
 	ib.Size, err = file.Seek(0, 1)
@@ -178,18 +194,26 @@ func (ib *IndexBlock) CreateFromDataRecords(sparseDeg int, recs []DataRecord) ([
 }
 
 // writeRecord write a single IndexRecord to the given file.
-func (ib *IndexBlock) writeRecord(file *os.File, ir IndexRecord) error {
-	err := util.WriteUvarint(file, uint64(len(ir.Key)))
-	if err != nil {
-		return err
+func (ib *IndexBlock) writeRecord(file *os.File, ir IndexRecord, compressionDict *compression.Dictionary) error {
+	if compressionDict == nil { // compression off
+		// key-size
+		err := util.WriteUvarint(file, uint64(len(ir.Key)))
+		if err != nil {
+			return err
+		}
+		// key
+		_, err = file.Write(ir.Key)
+		if err != nil {
+			return err
+		}
+	} else { // compression on
+		err := util.WriteUvarint(file, uint64(compressionDict.GetIdx(ir.Key)))
+		if err != nil {
+			return err
+		}
 	}
 
-	_, err = file.Write(ir.Key)
-	if err != nil {
-		return err
-	}
-
-	err = util.WriteUvarint(file, uint64(ir.Offset))
+	err := util.WriteUvarint(file, uint64(ir.Offset))
 	if err != nil {
 		return err
 	}
@@ -198,21 +222,31 @@ func (ib *IndexBlock) writeRecord(file *os.File, ir IndexRecord) error {
 }
 
 // getRecordAtOffset returns the IndexRecord at the given offset in the index block file.
-func (ib *IndexBlock) getRecordAtOffset(file *os.File, offset int64) (*IndexRecord, error) {
+func (ib *IndexBlock) getRecordAtOffset(file *os.File, offset int64, compressionDict *compression.Dictionary) (*IndexRecord, error) {
 	_, err := file.Seek(ib.StartOffset+offset, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	keySize, err := util.ReadUvarint(file)
-	if err != nil {
-		return nil, err
-	}
-
-	key := make([]byte, keySize)
-	_, err = file.Read(key)
-	if err != nil {
-		return nil, err
+	var key []byte
+	if compressionDict == nil { // compression off
+		// key-size
+		keySize, err := util.ReadUvarint(file)
+		if err != nil {
+			return nil, err
+		}
+		// key
+		key = make([]byte, keySize)
+		_, err = file.Read(key)
+		if err != nil {
+			return nil, err
+		}
+	} else { // compression on
+		keyIdx, err := util.ReadUvarint(file)
+		if err != nil {
+			return nil, err
+		}
+		key = compressionDict.GetKey(int(keyIdx))
 	}
 
 	irOffset, err := util.ReadUvarint(file)
@@ -227,7 +261,7 @@ func (ib *IndexBlock) getRecordAtOffset(file *os.File, offset int64) (*IndexReco
 // equal to the given key, starting from the given offset.
 // Returns the record if the key is found, or nil if the key is not found.
 // Returns an error if there is an error while reading the index block.
-func (ib *IndexBlock) GetRecordWithKeyFromOffset(key []byte, offset int64) (*IndexRecord, error) {
+func (ib *IndexBlock) GetRecordWithKeyFromOffset(key []byte, offset int64, compressionDict *compression.Dictionary) (*IndexRecord, error) {
 	file, err := os.Open(ib.Filename)
 	if err != nil {
 		return nil, err
@@ -236,7 +270,7 @@ func (ib *IndexBlock) GetRecordWithKeyFromOffset(key []byte, offset int64) (*Ind
 
 	var lastFoundRecord *IndexRecord = nil
 	for {
-		idxRec, err := ib.getRecordAtOffset(file, offset)
+		idxRec, err := ib.getRecordAtOffset(file, offset, compressionDict)
 		if err != nil {
 			return nil, err
 		}
@@ -251,7 +285,7 @@ func (ib *IndexBlock) GetRecordWithKeyFromOffset(key []byte, offset int64) (*Ind
 		} else {
 			return lastFoundRecord, nil
 		}
-		offset += int64(idxRec.sizeOnDisk()) // offset of the next record
+		offset += int64(idxRec.sizeOnDisk(compressionDict)) // offset of the next record
 		if offset >= ib.Size {
 			return lastFoundRecord, nil
 		}

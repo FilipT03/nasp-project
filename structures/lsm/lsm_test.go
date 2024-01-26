@@ -42,24 +42,24 @@ func TestRead(t *testing.T) {
 		{Key: []byte("key4"), Value: []byte("value4"), Timestamp: 6},
 	}
 
-	sstable1, err := sstable.CreateSSTable(recs1, sstConfig)
+	sstable1, err := sstable.CreateSSTable(recs1, nil, sstConfig)
 	if err != nil {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
 
-	sstable2, err := sstable.CreateSSTable(recs2, sstConfig)
+	sstable2, err := sstable.CreateSSTable(recs2, nil, sstConfig)
 	if err != nil {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
 
 	// Merge the SSTables 1 and 2 and save to LSM Level 2
-	_, err = sstable.MergeSSTables(sstable1, sstable2, 2, sstConfig)
+	_, err = sstable.MergeSSTables(sstable1, sstable2, 2, sstConfig, nil)
 	if err != nil {
 		t.Errorf("Failed to merge SSTables: %v", err)
 	}
 
 	// Create SSTable 3 on LSM Level 1
-	_, err = sstable.CreateSSTable(recs3, sstConfig)
+	_, err = sstable.CreateSSTable(recs3, nil, sstConfig)
 	if err != nil {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestRead(t *testing.T) {
 			MaxLevel: 3,
 		},
 	}
-	dr, err := Read([]byte("key1"), config)
+	dr, err := Read([]byte("key1"), nil, config)
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestRead(t *testing.T) {
 		t.Errorf("Expected value of 'value1', got %v", dr.Value)
 	}
 
-	dr, err = Read([]byte("key2"), config)
+	dr, err = Read([]byte("key2"), nil, config)
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestRead(t *testing.T) {
 		t.Errorf("Expected value of 'value22', got %v", dr.Value)
 	}
 
-	dr, err = Read([]byte("key3"), config)
+	dr, err = Read([]byte("key3"), nil, config)
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}

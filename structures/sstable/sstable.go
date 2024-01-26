@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"nasp-project/model"
+	"nasp-project/structures/compression"
 	"nasp-project/structures/merkle_tree"
 	"nasp-project/util"
 	"os"
@@ -102,7 +103,7 @@ func initializeSSTable(level int, config *util.SSTableConfig) (*SSTable, error) 
 }
 
 // CreateSSTable creates an SSTable from the given data records and writes it to disk.
-func CreateSSTable(records []model.Record, config *util.SSTableConfig) (*SSTable, error) {
+func CreateSSTable(records []model.Record, compressionDict *compression.Dictionary, config *util.SSTableConfig) (*SSTable, error) {
 	sstable, err := initializeSSTable(1, config) // when creating from memory, always save to the level no 1
 	if err != nil {
 		return nil, err
@@ -110,7 +111,7 @@ func CreateSSTable(records []model.Record, config *util.SSTableConfig) (*SSTable
 
 	recs := dataRecordsFromRecords(records)
 
-	err = sstable.Data.Write(recs)
+	err = sstable.Data.Write(recs, compressionDict)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +119,7 @@ func CreateSSTable(records []model.Record, config *util.SSTableConfig) (*SSTable
 	if config.SingleFile {
 		sstable.Index.StartOffset = sstable.Data.StartOffset + sstable.Data.Size
 	}
-	idxRecs, err := sstable.Index.CreateFromDataRecords(config.IndexDegree, recs)
+	idxRecs, err := sstable.Index.CreateFromDataRecords(config.IndexDegree, recs, compressionDict)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +127,7 @@ func CreateSSTable(records []model.Record, config *util.SSTableConfig) (*SSTable
 	if config.SingleFile {
 		sstable.Summary.StartOffset = sstable.Index.StartOffset + sstable.Index.Size
 	}
-	err = sstable.Summary.CreateFromIndexRecords(config.SummaryDegree, idxRecs)
+	err = sstable.Summary.CreateFromIndexRecords(config.SummaryDegree, idxRecs, compressionDict)
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +418,7 @@ func OpenSSTableFromToc(tocPath string) (*SSTable, error) {
 // Read returns the record with the given key from the SSTable.
 // Returns nil if the key does not exist.
 // Returns an error if the read fails.
-func (sst *SSTable) Read(key []byte) (*model.Record, error) {
+func (sst *SSTable) Read(key []byte, compressionDict *compression.Dictionary) (*model.Record, error) {
 	if !sst.Filter.HasLoaded() {
 		err := sst.Filter.Load()
 		if err != nil {
@@ -432,7 +433,7 @@ func (sst *SSTable) Read(key []byte) (*model.Record, error) {
 	}
 
 	if !sst.Summary.HasRangeLoaded() {
-		err := sst.Summary.LoadRange()
+		err := sst.Summary.LoadRange(compressionDict)
 		if err != nil {
 			return nil, err
 		}
@@ -449,7 +450,7 @@ func (sst *SSTable) Read(key []byte) (*model.Record, error) {
 	}
 
 	if !sst.Summary.HasLoaded() {
-		err := sst.Summary.Load()
+		err := sst.Summary.Load(compressionDict)
 		if err != nil {
 			return nil, err
 		}
@@ -457,17 +458,17 @@ func (sst *SSTable) Read(key []byte) (*model.Record, error) {
 			sst.Summary.Records = nil
 		}()
 	}
-	sr, err := sst.Summary.GetIndexOffset(key)
+	sr, err := sst.Summary.GetIndexOffset(key, compressionDict)
 	if err != nil {
 		return nil, err
 	}
 
-	ir, err := sst.Index.GetRecordWithKeyFromOffset(key, sr.Offset)
+	ir, err := sst.Index.GetRecordWithKeyFromOffset(key, sr.Offset, compressionDict)
 	if err != nil {
 		return nil, err
 	}
 
-	dr, err := sst.Data.GetRecordWithKeyFromOffset(key, ir.Offset)
+	dr, err := sst.Data.GetRecordWithKeyFromOffset(key, ir.Offset, compressionDict)
 	if err != nil {
 		return nil, err
 	}
@@ -484,13 +485,13 @@ func (sst *SSTable) Read(key []byte) (*model.Record, error) {
 // Removes the input SSTables from disk.
 // Returns the new SSTable.
 // Returns an error if the merge fails.
-func MergeSSTables(sst1, sst2 *SSTable, level int, config *util.SSTableConfig) (*SSTable, error) {
+func MergeSSTables(sst1, sst2 *SSTable, level int, config *util.SSTableConfig, compressionDict *compression.Dictionary) (*SSTable, error) {
 	sstable, err := initializeSSTable(level, config)
 	if err != nil {
 		return nil, err
 	}
 
-	numRecords, err := sstable.Data.WriteMerged(&sst1.Data, &sst2.Data)
+	numRecords, err := sstable.Data.WriteMerged(&sst1.Data, &sst2.Data, compressionDict)
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +499,7 @@ func MergeSSTables(sst1, sst2 *SSTable, level int, config *util.SSTableConfig) (
 	if config.SingleFile {
 		sstable.Index.StartOffset = sstable.Data.StartOffset + sstable.Data.Size
 	}
-	err = sstable.Index.CreateFromDataBlock(config.IndexDegree, &sstable.Data)
+	err = sstable.Index.CreateFromDataBlock(config.IndexDegree, &sstable.Data, compressionDict)
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +507,7 @@ func MergeSSTables(sst1, sst2 *SSTable, level int, config *util.SSTableConfig) (
 	if config.SingleFile {
 		sstable.Summary.StartOffset = sstable.Index.StartOffset + sstable.Index.Size
 	}
-	err = sstable.Summary.CreateFromIndexBlock(config.SummaryDegree, &sstable.Index)
+	err = sstable.Summary.CreateFromIndexBlock(config.SummaryDegree, &sstable.Index, compressionDict)
 	if err != nil {
 		return nil, err
 	}
@@ -514,7 +515,7 @@ func MergeSSTables(sst1, sst2 *SSTable, level int, config *util.SSTableConfig) (
 	if config.SingleFile {
 		sstable.Filter.StartOffset = sstable.Summary.StartOffset + sstable.Summary.Size
 	}
-	err = sstable.Filter.CreateFromDataBlock(numRecords, config.FilterPrecision, &sstable.Data)
+	err = sstable.Filter.CreateFromDataBlock(numRecords, config.FilterPrecision, &sstable.Data, compressionDict)
 	if err != nil {
 		return nil, err
 	}
