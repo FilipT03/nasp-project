@@ -565,6 +565,7 @@ func (sst *SSTable) Read(key []byte) (*model.Record, error) {
 	}, nil
 }
 
+// BuildFromDataBlock assumes that data block is correctly created and creates all other components of the SSTable.
 func (sst *SSTable) BuildFromDataBlock(numRecords uint, config *util.SSTableConfig) error {
 	if config.SingleFile {
 		sst.Index.StartOffset = sst.Data.StartOffset + sst.Data.Size
