@@ -3,14 +3,14 @@ package skip_list
 import (
 	"errors"
 	"nasp-project/model"
-	"nasp-project/structures/iterator"
+	"nasp-project/util"
 )
 
 type SkipListIter struct {
 	current *skipListNode
 }
 
-func (sl *SkipList) NewIterator() (iterator.Iterator, error) {
+func (sl *SkipList) NewIterator() (util.Iterator, error) {
 	if sl.size == 0 {
 		return nil, errors.New("error: SkipList is empty")
 	}

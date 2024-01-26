@@ -3,7 +3,7 @@ package b_tree
 import (
 	"errors"
 	"nasp-project/model"
-	"nasp-project/structures/iterator"
+	"nasp-project/util"
 )
 
 type BTreeIter struct {
@@ -24,7 +24,7 @@ func (b *BTreeIter) Value() *model.Record {
 	return nil
 }
 
-func (bt *BTree) NewIterator() (iterator.Iterator, error) {
+func (bt *BTree) NewIterator() (util.Iterator, error) {
 	if bt.size == 0 {
 		return nil, errors.New("error: btree is empty")
 	}
