@@ -41,7 +41,7 @@ func MergeSSTables(sst1, sst2 *SSTable, level int, config *util.SSTableConfig, c
 
 // MergeMultipleSSTables merges the given SSTables and writes the result to disk.
 // Removes the input SSTables from disk.
-// Returns the list of newly created SSTables.
+// Returns the newly created SSTable.
 // Returns an error if the merge fails.
 func MergeMultipleSSTables(tables []*SSTable, level int, config *util.SSTableConfig, compressionDict *compression.Dictionary) (*SSTable, error) {
 	if len(tables) < 1 {
