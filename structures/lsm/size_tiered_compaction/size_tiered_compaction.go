@@ -26,19 +26,15 @@ func Compact(sstableConfig *util.SSTableConfig, lsmConfig *util.LSMTreeConfig) {
 		fileNames := FindSSTables(pathToToc)
 		// if there are no SSTables in the current level
 		if len(fileNames) == 0 {
-			if level == 1 {
-				fmt.Println("There is no sstables currently")
-			}
 			return
 		}
 		// if there is only one SSTable in the current level
 		if level == 1 {
 			if len(fileNames) == 1 {
-				fmt.Println("Only one sstable no compaction needed")
 				return
 			}
 			if len(fileNames) < maxLsmNodesPerLevel {
-				fmt.Println("There is not enough sstables for compaction")
+				return
 			}
 		}
 		// if the number of SSTables is greater than the maximum number of nodes in the current level
@@ -56,18 +52,15 @@ func Compact(sstableConfig *util.SSTableConfig, lsmConfig *util.LSMTreeConfig) {
 			// merge the first two SSTables from fileNames
 			sstable1, err := sstable.OpenSSTableFromToc(pathToToc + "/" + fileNames[0])
 			if err != nil {
-				fmt.Println("Error opening sstable")
 				return
 			}
 			sstable2, err := sstable.OpenSSTableFromToc(pathToToc + "/" + fileNames[1])
 			if err != nil {
-				fmt.Println("Error opening sstable")
 				return
 			}
 			// merge the two SSTables and save the result in the next level
 			_, err = sstable.MergeSSTables(sstable1, sstable2, level+1, *sstableConfig)
 			if err != nil {
-				fmt.Println("Error merging sstables")
 				return
 			}
 			// set fileNames to the remaining SSTables
