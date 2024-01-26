@@ -2,6 +2,7 @@ package sstable
 
 import (
 	"nasp-project/structures/bloom_filter"
+	"nasp-project/structures/compression"
 	"nasp-project/util"
 	"os"
 )
@@ -46,7 +47,7 @@ func (fb *FilterBlock) CreateFilter(keys [][]byte, p float64) {
 }
 
 // CreateFromDataBlock creates a filter from a given DataBlock by adding the key of each record.
-func (fb *FilterBlock) CreateFromDataBlock(n uint, p float64, db *DataBlock) error {
+func (fb *FilterBlock) CreateFromDataBlock(n uint, p float64, db *DataBlock, compressionDict *compression.Dictionary) error {
 	fb.Filter = bloom_filter.NewBloomFilter(n, p)
 
 	file, err := os.Open(db.Filename)
@@ -75,14 +76,17 @@ func (fb *FilterBlock) CreateFromDataBlock(n uint, p float64, db *DataBlock) err
 		}
 
 		tombstone := make([]byte, 1)
-		rl, err := file.Read(tombstone)
+		_, err = file.Read(tombstone)
 		if err != nil {
 			return err
 		}
 
-		keySize, err := util.ReadUvarint(file)
-		if err != nil {
-			return err
+		var keySize uint64 // only if compression is turned off
+		if compressionDict == nil {
+			keySize, err = util.ReadUvarint(file)
+			if err != nil {
+				return err
+			}
 		}
 
 		var valueSize uint64 = 0
@@ -93,13 +97,21 @@ func (fb *FilterBlock) CreateFromDataBlock(n uint, p float64, db *DataBlock) err
 			}
 		}
 
-		key := make([]byte, keySize)
-		rl, err = file.Read(key)
-		if rl != len(key) {
-			break
-		}
-		if err != nil {
-			return err
+		var key []byte
+		if compressionDict == nil {
+			// compression is off, read the key as-is
+			key = make([]byte, keySize)
+			_, err = file.Read(key)
+			if err != nil {
+				return err
+			}
+		} else {
+			// compression is on, get the key from compression dictionary
+			keyIdx, err := util.ReadUvarint(file)
+			if err != nil {
+				return err
+			}
+			key = compressionDict.GetKey(int(keyIdx))
 		}
 
 		_, err = file.Seek(int64(valueSize), 1)

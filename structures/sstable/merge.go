@@ -2,6 +2,7 @@ package sstable
 
 import (
 	"errors"
+	"nasp-project/structures/compression"
 	"nasp-project/util"
 )
 
@@ -9,18 +10,18 @@ import (
 // Removes the input SSTables from disk.
 // Returns the new SSTable.
 // Returns an error if the merge fails.
-func MergeSSTables(sst1, sst2 *SSTable, level int, config util.SSTableConfig) (*SSTable, error) {
+func MergeSSTables(sst1, sst2 *SSTable, level int, config *util.SSTableConfig, compressionDict *compression.Dictionary) (*SSTable, error) {
 	sstable, err := initializeSSTable(level, config)
 	if err != nil {
 		return nil, err
 	}
 
-	numRecords, err := sstable.Data.WriteMerged(&sst1.Data, &sst2.Data)
+	numRecords, err := sstable.Data.WriteMerged(&sst1.Data, &sst2.Data, compressionDict)
 	if err != nil {
 		return nil, err
 	}
 
-	err = sstable.BuildFromDataBlock(numRecords, &config)
+	err = sstable.BuildFromDataBlock(numRecords, compressionDict, config)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +43,7 @@ func MergeSSTables(sst1, sst2 *SSTable, level int, config util.SSTableConfig) (*
 // Removes the input SSTables from disk.
 // Returns the list of newly created SSTables.
 // Returns an error if the merge fails.
-func MergeMultipleSSTables(tables []*SSTable, level int, config *util.SSTableConfig) (*SSTable, error) {
+func MergeMultipleSSTables(tables []*SSTable, level int, compressionDict *compression.Dictionary, config *util.SSTableConfig) (*SSTable, error) {
 	if len(tables) < 1 {
 		return nil, errors.New("no tables to merge")
 	}
@@ -50,11 +51,11 @@ func MergeMultipleSSTables(tables []*SSTable, level int, config *util.SSTableCon
 	for len(tables) > 1 {
 		var newTables []*SSTable
 		for i := 0; i+1 < len(tables); i += 2 {
-			newTable, err := initializeSSTable(level, *config)
+			newTable, err := initializeSSTable(level, config)
 			if err != nil {
 				return nil, err
 			}
-			numRecs, err = newTable.Data.WriteMerged(&tables[i].Data, &tables[i+1].Data)
+			numRecs, err = newTable.Data.WriteMerged(&tables[i].Data, &tables[i+1].Data, compressionDict)
 			if err != nil {
 				return nil, err
 			}
@@ -75,7 +76,7 @@ func MergeMultipleSSTables(tables []*SSTable, level int, config *util.SSTableCon
 		}
 		tables = newTables
 	}
-	err := tables[0].BuildFromDataBlock(numRecs, config)
+	err := tables[0].BuildFromDataBlock(numRecs, compressionDict, config)
 	if err != nil {
 		return nil, err
 	}
