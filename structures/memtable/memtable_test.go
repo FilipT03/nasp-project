@@ -304,38 +304,32 @@ func testValidRangeScan(structure string, t *testing.T) {
 	sol := []model.Record{
 		{
 			Key:       []byte("2"),
-			Value:     nil,
-			Tombstone: false,
 			Timestamp: 0,
 		},
 		{
 			Key:       []byte("3"),
-			Value:     nil,
-			Tombstone: false,
 			Timestamp: 5,
 		},
 		{
+			Key:       []byte("4"),
+			Timestamp: 0,
+		},
+		{
 			Key:       []byte("5"),
-			Value:     nil,
-			Tombstone: false,
 			Timestamp: 4,
 		},
 		{
 			Key:       []byte("6"),
-			Value:     nil,
-			Tombstone: false,
 			Timestamp: 1,
 		},
 		{
 			Key:       []byte("8"),
-			Value:     nil,
-			Tombstone: false,
 			Timestamp: 3,
 		},
 	}
 
-	if len(records) != 5 {
-		t.Errorf("error: [%s] records size to be 5, got %d", structure, len(records))
+	if len(records) != 6 {
+		t.Errorf("error: [%s] records size to be 6, got %d", structure, len(records))
 		return
 	}
 
@@ -385,51 +379,41 @@ func testValidPrefixScan(structure string, t *testing.T) {
 	records := mts.PrefixScan([]byte("aab"))
 	sol := []model.Record{
 		{
+			Key:       []byte("aab"),
+			Timestamp: 12,
+		},
+		{
 			Key:       []byte("aabaa"),
-			Value:     nil,
-			Tombstone: false,
 			Timestamp: 0,
 		},
 		{
 			Key:       []byte("aabaca"),
-			Value:     nil,
-			Tombstone: false,
 			Timestamp: 9,
 		},
 		{
 			Key:       []byte("aabacav"),
-			Value:     nil,
-			Tombstone: false,
 			Timestamp: 2,
 		},
 		{
 			Key:       []byte("aabbc"),
-			Value:     nil,
-			Tombstone: false,
 			Timestamp: 16,
 		},
 		{
 			Key:       []byte("aabbccdd"),
-			Value:     nil,
-			Tombstone: false,
 			Timestamp: 10,
 		},
 		{
 			Key:       []byte("aabbs"),
-			Value:     nil,
-			Tombstone: false,
 			Timestamp: 3,
 		},
 		{
 			Key:       []byte("aabcay"),
-			Value:     nil,
-			Tombstone: false,
 			Timestamp: 4,
 		},
 	}
 
-	if len(records) != 7 {
-		t.Errorf("error: [%s] expected records size to be 7, got %d", structure, len(records))
+	if len(records) != 8 {
+		t.Errorf("error: [%s] expected records size to be 8, got %d", structure, len(records))
 	}
 
 	for i, record := range records {

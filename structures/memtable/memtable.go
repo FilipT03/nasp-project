@@ -153,9 +153,9 @@ func isMinimalKey(iter util.Iterator, minKey []byte, maxTimestamp uint64) bool {
 		(bytes.Equal(iter.Value().Key, minKey) && iter.Value().Timestamp > maxTimestamp))
 }
 
-// isInvalidKey checks if the key has its tombstone set to true or if it is a reserved word.
+// isInvalidKey checks if the key is a reserved word.
 func isInvalidKey(iter util.Iterator) bool {
-	return iter != nil && iter.Value() != nil && (iter.Value().Tombstone || util.IsReservedKey(iter.Value().Key))
+	return iter != nil && iter.Value() != nil && util.IsReservedKey(iter.Value().Key)
 }
 
 // RangeScan returns records from memtables within the inclusive range [minValue, maxValue].
@@ -200,10 +200,8 @@ func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Recor
 				iterators[minIndex] = nil
 				continue
 			}
-			if !util.IsReservedKey(minKey) {
-				records = append(records, iterators[minIndex].Value())
-				seenValues[string(minKey)] = true
-			}
+			records = append(records, iterators[minIndex].Value())
+			seenValues[string(minKey)] = true
 		}
 
 		if !iterators[minIndex].Next() || bytes.Compare(iterators[minIndex].Value().Key, maxValue) > 0 {
