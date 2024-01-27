@@ -3,6 +3,7 @@ package sstable
 import (
 	bytesUtil "bytes"
 	"encoding/binary"
+	"nasp-project/structures/compression"
 	"nasp-project/util"
 	"os"
 )
@@ -45,7 +46,7 @@ func (sb *SummaryBlock) HasRangeLoaded() bool {
 }
 
 // LoadRange reads the start and end keys from the summary block file and loads them into memory.
-func (sb *SummaryBlock) LoadRange() error {
+func (sb *SummaryBlock) LoadRange(compressionDict *compression.Dictionary) error {
 	file, err := os.Open(sb.Filename)
 	if err != nil {
 		return err
@@ -57,39 +58,49 @@ func (sb *SummaryBlock) LoadRange() error {
 		return err
 	}
 
-	startSizeBytes := make([]byte, 8)
-	_, err = file.Read(startSizeBytes)
-	if err != nil {
-		return err
-	}
-	startSize := binary.LittleEndian.Uint64(startSizeBytes)
+	if compressionDict == nil { // compression off
+		startSize, err := util.ReadUvarint(file)
+		if err != nil {
+			return err
+		}
 
-	sb.StartKey = make([]byte, startSize)
-	_, err = file.Read(sb.StartKey)
-	if err != nil {
-		return err
-	}
+		sb.StartKey = make([]byte, startSize)
+		_, err = file.Read(sb.StartKey)
+		if err != nil {
+			return err
+		}
 
-	endSizeBytes := make([]byte, 8)
-	_, err = file.Read(endSizeBytes)
-	if err != nil {
-		return err
-	}
-	endSize := binary.LittleEndian.Uint64(endSizeBytes)
+		endSize, err := util.ReadUvarint(file)
+		if err != nil {
+			return err
+		}
 
-	sb.EndKey = make([]byte, endSize)
-	_, err = file.Read(sb.EndKey)
-	if err != nil {
-		return err
+		sb.EndKey = make([]byte, endSize)
+		_, err = file.Read(sb.EndKey)
+		if err != nil {
+			return err
+		}
+	} else { // compression on
+		keyIdx, err := util.ReadUvarint(file)
+		if err != nil {
+			return err
+		}
+		sb.StartKey = compressionDict.GetKey(int(keyIdx))
+
+		keyIdx, err = util.ReadUvarint(file)
+		if err != nil {
+			return err
+		}
+		sb.EndKey = compressionDict.GetKey(int(keyIdx))
 	}
 
 	return nil
 }
 
 // Load reads the summary block from disk and loads it into memory.
-func (sb *SummaryBlock) Load() error {
+func (sb *SummaryBlock) Load(compressionDict *compression.Dictionary) error {
 	if !sb.HasRangeLoaded() {
-		err := sb.LoadRange()
+		err := sb.LoadRange(compressionDict)
 		if err != nil {
 			return err
 		}
@@ -101,7 +112,23 @@ func (sb *SummaryBlock) Load() error {
 	}
 	defer file.Close()
 
-	_, err = file.Seek(sb.StartOffset+16+int64(len(sb.StartKey))+int64(len(sb.EndKey)), 0)
+	// seek over the header
+	buf := make([]byte, binary.MaxVarintLen64)
+	if compressionDict == nil {
+		_, err = file.Seek(
+			sb.StartOffset+
+				int64(binary.PutUvarint(buf, uint64(len(sb.StartKey))))+
+				int64(binary.PutUvarint(buf, uint64(len(sb.EndKey))))+
+				int64(len(sb.StartKey))+
+				int64(len(sb.EndKey)),
+			0)
+	} else {
+		_, err = file.Seek(
+			sb.StartOffset+
+				int64(binary.PutUvarint(buf, uint64(compressionDict.GetIdx(sb.StartKey))))+
+				int64(binary.PutUvarint(buf, uint64(compressionDict.GetIdx(sb.StartKey)))),
+			0)
+	}
 	if err != nil {
 		return err
 	}
@@ -109,36 +136,38 @@ func (sb *SummaryBlock) Load() error {
 	sb.Records = make([]SummaryRecord, 0)
 
 	for {
-		keySizeBytes := make([]byte, 8)
-		rl, err := file.Read(keySizeBytes)
-		if rl != 8 {
-			break
+		var key []byte
+		if compressionDict == nil {
+			keySize, err := util.ReadUvarint(file)
+			if err != nil {
+				return err
+			}
+
+			key = make([]byte, keySize)
+			_, err = file.Read(key)
+			if err != nil {
+				return err
+			}
+		} else {
+			keyIdx, err := util.ReadUvarint(file)
+			if err != nil {
+				return err
+			}
+			key = compressionDict.GetKey(int(keyIdx))
 		}
+
+		offset, err := util.ReadUvarint(file)
 		if err != nil {
 			return err
 		}
-		keySize := binary.LittleEndian.Uint64(keySizeBytes)
 
-		key := make([]byte, keySize)
-		_, err = file.Read(key)
-		if err != nil {
-			return err
-		}
-
-		offsetBytes := make([]byte, 8)
-		_, err = file.Read(offsetBytes)
-		if err != nil {
-			return err
-		}
-		offset := int64(binary.LittleEndian.Uint64(offsetBytes))
-
-		sb.Records = append(sb.Records, SummaryRecord{key, offset})
+		sb.Records = append(sb.Records, SummaryRecord{key, int64(offset)})
 
 		pos, err := file.Seek(0, 1)
 		if err != nil {
 			return err
 		}
-		if pos >= sb.Size {
+		if pos >= sb.StartOffset+sb.Size {
 			break
 		}
 	}
@@ -149,8 +178,7 @@ func (sb *SummaryBlock) Load() error {
 // CreateFromIndexBlock creates a summary block from the given index block and writes it to disk.
 // The sparseDeg parameter determines how many index records are skipped between each summary record.
 // It also sets the size of the summary block.
-// Note: The summary block is not loaded into memory.
-func (sb *SummaryBlock) CreateFromIndexBlock(sparseDeg int, ib *IndexBlock) error {
+func (sb *SummaryBlock) CreateFromIndexBlock(sparseDeg int, ib *IndexBlock, compressionDict *compression.Dictionary) error {
 	ibFile, err := os.Open(ib.Filename)
 	if err != nil {
 		return err
@@ -163,55 +191,73 @@ func (sb *SummaryBlock) CreateFromIndexBlock(sparseDeg int, ib *IndexBlock) erro
 	}
 
 	var bytes []byte // Summary Records
-	startSizeBytes := make([]byte, 8)
 	var startKey []byte = nil
-	endSizeBytes := make([]byte, 8)
 	var endKey []byte
 
 	for cnt := 0; ; cnt++ {
-		keySizeBytes := make([]byte, 8)
-		rl, err := ibFile.Read(keySizeBytes)
-		if rl != 8 {
-			break
+		var recSize int64 = 0
+		var key []byte
+		if compressionDict == nil {
+			keySize, n, err := util.ReadUvarintLen(ibFile)
+			if err != nil {
+				return err
+			}
+			if n == 0 {
+				break
+			}
+			recSize += int64(n)
+
+			key = make([]byte, keySize)
+			_, err = ibFile.Read(key)
+			if err != nil {
+				return err
+			}
+			recSize += int64(keySize)
+		} else {
+			keyIdx, n, err := util.ReadUvarintLen(ibFile)
+			if err != nil {
+				return err
+			}
+			if n == 0 {
+				break
+			}
+			recSize += int64(n)
+
+			key = compressionDict.GetKey(int(keyIdx))
 		}
+
+		_, n, err := util.ReadUvarintLen(ibFile)
 		if err != nil {
 			return err
 		}
-		keySize := binary.LittleEndian.Uint64(keySizeBytes)
+		recSize += int64(n)
 
-		key := make([]byte, keySize)
-		_, err = ibFile.Read(key)
-		if err != nil {
-			return err
-		}
-
-		offset, err := ibFile.Seek(8, 1) // Skip over the offset
+		offset, err := ibFile.Seek(0, 1)
 		if err != nil {
 			return err
 		}
 
 		if cnt%sparseDeg == 0 {
-			offset -= 16 + int64(len(key)) // Start of the record
+			offset -= ib.StartOffset
+			offset -= recSize // Start of the record
 
 			sr := SummaryRecord{
 				Key:    key,
-				Offset: offset - ib.StartOffset,
+				Offset: offset,
 			}
-			bytes = append(bytes, sb.writeRecord(sr)...)
+			bytes = append(bytes, sb.writeRecord(sr, compressionDict)...)
 
 			if startKey == nil { // First key
-				binary.LittleEndian.PutUint64(startSizeBytes, uint64(len(key)))
 				startKey = key
 			}
 
-			offset += 16 + int64(len(key)) // End of the record
+			offset += recSize
 		}
 
 		// Last key
-		binary.LittleEndian.PutUint64(endSizeBytes, uint64(len(key)))
 		endKey = key
 
-		if offset >= ib.Size {
+		if offset >= ib.StartOffset+ib.Size {
 			break
 		}
 	}
@@ -228,97 +274,44 @@ func (sb *SummaryBlock) CreateFromIndexBlock(sparseDeg int, ib *IndexBlock) erro
 		return err
 	}
 
-	// Start Key
-	_, err = file.Write(startSizeBytes)
-	if err != nil {
-		return err
-	}
-	_, err = file.Write(startKey)
-	if err != nil {
-		return err
-	}
-
-	// End Key
-	_, err = file.Write(endSizeBytes)
-	if err != nil {
-		return err
-	}
-	_, err = file.Write(endKey)
-	if err != nil {
-		return err
-	}
-
-	// Summary Records
-	_, err = file.Write(bytes)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// CreateFromIndexRecords creates a summary block from the given index records and writes it to disk.
-// The sparseDeg parameter determines how many index records are skipped between each summary record.
-// It also sets the size of the summary block.
-// Note: The summary block is not loaded into memory.
-func (sb *SummaryBlock) CreateFromIndexRecords(sparseDeg int, recs []IndexRecord) error {
-	var bytes []byte
-	sumRecs := make([]SummaryRecord, 0, len(recs)/sparseDeg)
-
-	var offset int64 = 0
-	for cnt, rec := range recs {
-		if cnt%sparseDeg == 0 {
-			sr := SummaryRecord{
-				Key:    rec.Key,
-				Offset: offset,
-			}
-			sumRecs = append(sumRecs, sr)
-			cb := sb.writeRecord(sr)
-			bytes = append(bytes, cb...)
+	if compressionDict == nil { // compression off
+		// Start Key
+		err = util.WriteUvarint(file, uint64(len(startKey)))
+		if err != nil {
+			return err
 		}
-		offset += 16 + int64(len(rec.Key))
-	}
+		_, err = file.Write(startKey)
+		if err != nil {
+			return err
+		}
 
-	// Open the file and write the summary block
-	file, err := os.OpenFile(sb.Filename, os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = file.Seek(sb.StartOffset, 0)
-	if err != nil {
-		return err
-	}
-
-	// Start Key
-	startSizeBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(startSizeBytes, uint64(len(sumRecs[0].Key)))
-	_, err = file.Write(startSizeBytes)
-	if err != nil {
-		return err
-	}
-
-	_, err = file.Write(sumRecs[0].Key)
-	if err != nil {
-		return err
-	}
-
-	// End Key
-	endSizeBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(endSizeBytes, uint64(len(recs[len(recs)-1].Key)))
-	_, err = file.Write(endSizeBytes)
-	if err != nil {
-		return err
-	}
-
-	_, err = file.Write(recs[len(recs)-1].Key)
-	if err != nil {
-		return err
+		// End Key
+		err = util.WriteUvarint(file, uint64(len(endKey)))
+		if err != nil {
+			return err
+		}
+		_, err = file.Write(endKey)
+		if err != nil {
+			return err
+		}
+	} else { // compression on
+		// Start Key
+		err = util.WriteUvarint(file, uint64(compressionDict.GetIdx(startKey)))
+		if err != nil {
+			return err
+		}
+		// End Key
+		err = util.WriteUvarint(file, uint64(compressionDict.GetIdx(endKey)))
+		if err != nil {
+			return err
+		}
 	}
 
 	// Summary Records
 	_, err = file.Write(bytes)
+	if err != nil {
+		return err
+	}
 
 	// Set the size of the summary block
 	sb.Size, err = file.Seek(0, 1)
@@ -330,19 +323,109 @@ func (sb *SummaryBlock) CreateFromIndexRecords(sparseDeg int, recs []IndexRecord
 	return nil
 }
 
-// writeRecord writes a single IndexRecord to a byte slice.
-func (sb *SummaryBlock) writeRecord(sr SummaryRecord) []byte {
-	bytes := make([]byte, 16+len(sr.Key))
+// CreateFromIndexRecords creates a summary block from the given index records and writes it to disk.
+// The sparseDeg parameter determines how many index records are skipped between each summary record.
+// It also sets the size of the summary block.
+func (sb *SummaryBlock) CreateFromIndexRecords(sparseDeg int, recs []IndexRecord, compressionDict *compression.Dictionary) error {
+	var bytes []byte
+	sumRecs := make([]SummaryRecord, 0, len(recs)/sparseDeg)
 
-	keySize := make([]byte, 8)
-	binary.LittleEndian.PutUint64(keySize, uint64(len(sr.Key)))
-	copy(bytes[0:8], keySize)
+	var offset int64 = 0
+	for cnt, rec := range recs {
+		if cnt%sparseDeg == 0 {
+			sr := SummaryRecord{
+				Key:    rec.Key,
+				Offset: offset,
+			}
+			sumRecs = append(sumRecs, sr)
+			cb := sb.writeRecord(sr, compressionDict)
+			bytes = append(bytes, cb...)
+		}
+		offset += int64(rec.sizeOnDisk(compressionDict))
+	}
 
-	copy(bytes[8:8+len(sr.Key)], sr.Key)
+	// Open the file and write the summary block
+	file, err := os.OpenFile(sb.Filename, os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
-	offsetBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(offsetBytes, uint64(sr.Offset))
-	copy(bytes[8+len(sr.Key):], offsetBytes)
+	_, err = file.Seek(sb.StartOffset, 0)
+	if err != nil {
+		return err
+	}
+
+	if compressionDict == nil { // compression off
+		// Start Key
+		err = util.WriteUvarint(file, uint64(len(sumRecs[0].Key)))
+		if err != nil {
+			return err
+		}
+
+		_, err = file.Write(sumRecs[0].Key)
+		if err != nil {
+			return err
+		}
+
+		// End Key
+		err = util.WriteUvarint(file, uint64(len(recs[len(recs)-1].Key)))
+		if err != nil {
+			return err
+		}
+
+		_, err = file.Write(recs[len(recs)-1].Key)
+		if err != nil {
+			return err
+		}
+	} else { // compression on
+		// Start Key
+		err = util.WriteUvarint(file, uint64(compressionDict.GetIdx(sumRecs[0].Key)))
+		if err != nil {
+			return err
+		}
+		// End Key
+		err = util.WriteUvarint(file, uint64(compressionDict.GetIdx(recs[len(recs)-1].Key)))
+		if err != nil {
+			return err
+		}
+	}
+
+	// Summary Records
+	_, err = file.Write(bytes)
+	if err != nil {
+		return err
+	}
+
+	// Set the size of the summary block
+	sb.Size, err = file.Seek(0, 1)
+	if err != nil {
+		return err
+	}
+	sb.Size -= sb.StartOffset
+
+	return nil
+}
+
+// writeRecord writes a single SummaryRecord to a byte slice.
+func (sb *SummaryBlock) writeRecord(sr SummaryRecord, compressionDict *compression.Dictionary) []byte {
+	bytes := make([]byte, 0)
+
+	if compressionDict == nil { // compression off
+		keySize := make([]byte, binary.MaxVarintLen64)
+		n := binary.PutUvarint(keySize, uint64(len(sr.Key)))
+		bytes = append(bytes, keySize[:n]...)
+
+		bytes = append(bytes, sr.Key...)
+	} else { // compression on
+		keyIdx := make([]byte, binary.MaxVarintLen64)
+		n := binary.PutUvarint(keyIdx, uint64(compressionDict.GetIdx(sr.Key)))
+		bytes = append(bytes, keyIdx[:n]...)
+	}
+
+	offset := make([]byte, binary.MaxVarintLen64)
+	n := binary.PutUvarint(offset, uint64(sr.Offset))
+	bytes = append(bytes, offset[:n]...)
 
 	return bytes
 }
@@ -351,9 +434,9 @@ func (sb *SummaryBlock) writeRecord(sr SummaryRecord) []byte {
 // It returns nil if the key is not found.
 // Note: If the summary block is not loaded into memory, it will be loaded.
 // It returns an error if the summary block cannot be read.
-func (sb *SummaryBlock) GetIndexOffset(key []byte) (*SummaryRecord, error) {
+func (sb *SummaryBlock) GetIndexOffset(key []byte, compressionDict *compression.Dictionary) (*SummaryRecord, error) {
 	if !sb.HasLoaded() {
-		err := sb.Load()
+		err := sb.Load(compressionDict)
 		if err != nil {
 			return nil, err
 		}

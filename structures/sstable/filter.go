@@ -1,8 +1,8 @@
 package sstable
 
 import (
-	"encoding/binary"
 	"nasp-project/structures/bloom_filter"
+	"nasp-project/structures/compression"
 	"nasp-project/util"
 	"os"
 )
@@ -46,7 +46,8 @@ func (fb *FilterBlock) CreateFilter(keys [][]byte, p float64) {
 	}
 }
 
-func (fb *FilterBlock) CreateFromDataBlock(n uint, p float64, db *DataBlock) error {
+// CreateFromDataBlock creates a filter from a given DataBlock by adding the key of each record.
+func (fb *FilterBlock) CreateFromDataBlock(n uint, p float64, db *DataBlock, compressionDict *compression.Dictionary) error {
 	fb.Filter = bloom_filter.NewBloomFilter(n, p)
 
 	file, err := os.Open(db.Filename)
@@ -61,53 +62,56 @@ func (fb *FilterBlock) CreateFromDataBlock(n uint, p float64, db *DataBlock) err
 	}
 
 	for {
-		offset, err := file.Seek(12, 1)
+		offset, err := file.Seek(4, 1) // skip CRC
 		if err != nil {
 			return err
 		}
-		if offset >= db.Size {
+		if offset >= db.StartOffset+db.Size {
 			break
+		}
+
+		_, err = util.ReadUvarint(file) // skip timestamp
+		if err != nil {
+			return err
 		}
 
 		tombstone := make([]byte, 1)
-		rl, err := file.Read(tombstone)
-		if rl != 1 {
-			break
-		}
+		_, err = file.Read(tombstone)
 		if err != nil {
 			return err
 		}
 
-		keySizeBytes := make([]byte, 8)
-		rl, err = file.Read(keySizeBytes)
-		if rl != 8 {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		keySize := binary.LittleEndian.Uint64(keySizeBytes)
-
-		var valueSize uint64 = 0
-		if tombstone[0] == 0 {
-			valueSizeBytes := make([]byte, 8)
-			rl, err = file.Read(valueSizeBytes)
-			if rl != 8 {
-				break
-			}
+		var keySize uint64 // only if compression is turned off
+		if compressionDict == nil {
+			keySize, err = util.ReadUvarint(file)
 			if err != nil {
 				return err
 			}
-			valueSize = binary.LittleEndian.Uint64(valueSizeBytes)
 		}
 
-		key := make([]byte, keySize)
-		rl, err = file.Read(key)
-		if rl != len(key) {
-			break
+		var valueSize uint64 = 0
+		if tombstone[0] == 0 {
+			valueSize, err = util.ReadUvarint(file)
+			if err != nil {
+				return err
+			}
 		}
-		if err != nil {
-			return err
+
+		var key []byte
+		if compressionDict == nil {
+			// compression is off, read the key as-is
+			key = make([]byte, keySize)
+			_, err = file.Read(key)
+			if err != nil {
+				return err
+			}
+		} else {
+			// compression is on, get the key from compression dictionary
+			keyIdx, err := util.ReadUvarint(file)
+			if err != nil {
+				return err
+			}
+			key = compressionDict.GetKey(int(keyIdx))
 		}
 
 		_, err = file.Seek(int64(valueSize), 1)

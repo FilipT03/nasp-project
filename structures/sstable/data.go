@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"nasp-project/model"
+	"nasp-project/structures/compression"
 	"nasp-project/util"
 	"os"
 )
@@ -12,9 +13,9 @@ import (
 /*
 	=== DATA RECORD ===
 
-	+---------------+-----------------+---------------+---------------+-----------------+-...-+--...--+
-	|    CRC (4B)   | Timestamp (8B)  | Tombstone(1B) | Key Size (8B) | Value Size (8B) | Key | Value |
-	+---------------+-----------------+---------------+---------------+-----------------+-...-+--...--+
+	+---------------+------------------+---------------+----------------+------------------+-...-+--...--+
+	|    CRC (4B)   | Timestamp (VAR)  | Tombstone(1B) | Key Size (VAR) | Value Size (VAR) | Key | Value |
+	+---------------+------------------+---------------+----------------+------------------+-...-+--...--+
 	CRC = 32bit hash computed over the payload using CRC
 	Timestamp = Timestamp of the operation in seconds
 	Tombstone = If this record was deleted
@@ -24,6 +25,7 @@ import (
 	Value = Value data (only if Tombstone is 0)
 
 	NOTE: Value and Value Size are left out if Tombstone is set.
+	NOTE: Fields marked with VAR are encoded using variable encoding and take up between 1 and 10 bytes.
 	NOTE: Records are sorted by Key
 */
 
@@ -39,6 +41,21 @@ type DataRecord struct {
 // DataBlock represents a data block in an SSTable.
 type DataBlock struct {
 	util.BinaryFile // Only file block because nothing is ever loaded into memory
+}
+
+// sizeOnDisk returns the number of bytes that DataRecord would occupy on disk.
+func (dr *DataRecord) sizeOnDisk(compressionDict *compression.Dictionary) int {
+	buf := make([]byte, binary.MaxVarintLen64)
+	res := 4 + binary.PutUvarint(buf, dr.Timestamp) + 1
+	if compressionDict == nil {
+		res += binary.PutUvarint(buf, uint64(len(dr.Key))) + len(dr.Key)
+	} else {
+		res += binary.PutUvarint(buf, uint64(compressionDict.GetIdx(dr.Key)))
+	}
+	if !dr.Tombstone {
+		res += binary.PutUvarint(buf, uint64(len(dr.Value))) + len(dr.Value)
+	}
+	return res
 }
 
 // getCRC calculates the CRC checksum of a given record
@@ -83,7 +100,7 @@ func dataRecordsFromRecords(recs []model.Record) []DataRecord {
 
 // Write writes the records to the data block file.
 // It also sets the size of the data block.
-func (db *DataBlock) Write(recs []DataRecord) error {
+func (db *DataBlock) Write(recs []DataRecord, compressionDict *compression.Dictionary) error {
 	file, err := os.OpenFile(db.Filename, os.O_WRONLY, 0644)
 	if err != nil {
 		return err
@@ -95,7 +112,7 @@ func (db *DataBlock) Write(recs []DataRecord) error {
 	}
 
 	for _, rec := range recs {
-		err = db.writeRecord(file, &rec)
+		err = db.writeRecord(file, &rec, compressionDict)
 		if err != nil {
 			return err
 		}
@@ -111,7 +128,7 @@ func (db *DataBlock) Write(recs []DataRecord) error {
 }
 
 // writeRecord writes a record to the data block file.
-func (db *DataBlock) writeRecord(file *os.File, rec *DataRecord) error {
+func (db *DataBlock) writeRecord(file *os.File, rec *DataRecord, compressionDict *compression.Dictionary) error {
 	bytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(bytes, rec.CRC)
 	_, err := file.Write(bytes)
@@ -119,9 +136,7 @@ func (db *DataBlock) writeRecord(file *os.File, rec *DataRecord) error {
 		return err
 	}
 
-	bytes = make([]byte, 8)
-	binary.LittleEndian.PutUint64(bytes, rec.Timestamp)
-	_, err = file.Write(bytes)
+	err = util.WriteUvarint(file, rec.Timestamp)
 	if err != nil {
 		return err
 	}
@@ -138,25 +153,33 @@ func (db *DataBlock) writeRecord(file *os.File, rec *DataRecord) error {
 		}
 	}
 
-	bytes = make([]byte, 8)
-	binary.LittleEndian.PutUint64(bytes, uint64(len(rec.Key)))
-	_, err = file.Write(bytes)
-	if err != nil {
-		return err
-	}
-
-	if !rec.Tombstone {
-		bytes = make([]byte, 8)
-		binary.LittleEndian.PutUint64(bytes, uint64(len(rec.Value)))
-		_, err = file.Write(bytes)
+	if compressionDict == nil {
+		// KeySize is left out if the compression is turned on
+		err = util.WriteUvarint(file, uint64(len(rec.Key)))
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = file.Write(rec.Key)
-	if err != nil {
-		return err
+	if !rec.Tombstone {
+		err = util.WriteUvarint(file, uint64(len(rec.Value)))
+		if err != nil {
+			return err
+		}
+	}
+
+	if compressionDict == nil {
+		// compression if off, write the key bytes as-is
+		_, err = file.Write(rec.Key)
+		if err != nil {
+			return err
+		}
+	} else {
+		// compression is on, write only index from compression dictionary
+		err = util.WriteUvarint(file, uint64(compressionDict.GetIdx(rec.Key)))
+		if err != nil {
+			return err
+		}
 	}
 
 	if !rec.Tombstone {
@@ -180,7 +203,7 @@ func (db *DataBlock) isEndOfBlock(file *os.File) (bool, error) {
 
 // getNextRecord assumes the provided file is at the start of the record and reads the next record.
 // Returns nil if positioned at the end of data block.
-func (db *DataBlock) getNextRecord(file *os.File) (*DataRecord, error) {
+func (db *DataBlock) getNextRecord(file *os.File, compressionDict *compression.Dictionary) (*DataRecord, error) {
 	end, err := db.isEndOfBlock(file)
 	if err != nil {
 		return nil, err
@@ -199,12 +222,10 @@ func (db *DataBlock) getNextRecord(file *os.File) (*DataRecord, error) {
 	}
 	crc := binary.LittleEndian.Uint32(bytes)
 
-	bytes = make([]byte, 8)
-	_, err = file.Read(bytes)
+	timestamp, err := util.ReadUvarint(file)
 	if err != nil {
 		return nil, err
 	}
-	timestamp := binary.LittleEndian.Uint64(bytes)
 
 	bytes = make([]byte, 1)
 	_, err = file.Read(bytes)
@@ -213,27 +234,37 @@ func (db *DataBlock) getNextRecord(file *os.File) (*DataRecord, error) {
 	}
 	tombstone := bytes[0] == 1
 
-	bytes = make([]byte, 8)
-	_, err = file.Read(bytes)
-	if err != nil {
-		return nil, err
-	}
-	keySize := binary.LittleEndian.Uint64(bytes)
-
-	var valueSize uint64
-	if !tombstone {
-		bytes = make([]byte, 8)
-		_, err = file.Read(bytes)
+	var keySize uint64 // only if compression is turned off
+	if compressionDict == nil {
+		keySize, err = util.ReadUvarint(file)
 		if err != nil {
 			return nil, err
 		}
-		valueSize = binary.LittleEndian.Uint64(bytes)
 	}
 
-	key := make([]byte, keySize)
-	_, err = file.Read(key)
-	if err != nil {
-		return nil, err
+	var valueSize uint64
+	if !tombstone {
+		valueSize, err = util.ReadUvarint(file)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var key []byte
+	if compressionDict == nil {
+		// compression is off, read the key as-is
+		key = make([]byte, keySize)
+		_, err = file.Read(key)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// compression is on, get the key from compression dictionary
+		keyIdx, err := util.ReadUvarint(file)
+		if err != nil {
+			return nil, err
+		}
+		key = compressionDict.GetKey(int(keyIdx))
 	}
 
 	var value []byte
@@ -260,7 +291,7 @@ func (db *DataBlock) getNextRecord(file *os.File) (*DataRecord, error) {
 }
 
 // getRecordAtOffset reads a record from the data block file at the given offset.
-func (db *DataBlock) getRecordAtOffset(offset int64) (*DataRecord, error) {
+func (db *DataBlock) getRecordAtOffset(offset int64, compressionDict *compression.Dictionary) (*DataRecord, error) {
 	file, err := os.Open(db.Filename)
 	if err != nil {
 		return nil, err
@@ -272,12 +303,12 @@ func (db *DataBlock) getRecordAtOffset(offset int64) (*DataRecord, error) {
 		return nil, err
 	}
 
-	return db.getNextRecord(file)
+	return db.getNextRecord(file, compressionDict)
 }
 
 // GetRecordWithKeyFromOffset reads a record with the given key from the data block file, starting from the offset.
 // Returns nil if the record is not found.
-func (db *DataBlock) GetRecordWithKeyFromOffset(key []byte, offset int64) (*DataRecord, error) {
+func (db *DataBlock) GetRecordWithKeyFromOffset(key []byte, offset int64, compressionDict *compression.Dictionary) (*DataRecord, error) {
 	file, err := os.Open(db.Filename)
 	if err != nil {
 		return nil, err
@@ -290,7 +321,7 @@ func (db *DataBlock) GetRecordWithKeyFromOffset(key []byte, offset int64) (*Data
 	}
 
 	for {
-		dataRec, err := db.getRecordAtOffset(offset)
+		dataRec, err := db.getNextRecord(file, compressionDict)
 		if err != nil {
 			return nil, err
 		}
@@ -303,18 +334,13 @@ func (db *DataBlock) GetRecordWithKeyFromOffset(key []byte, offset int64) (*Data
 		} else if cmp > 0 {
 			return nil, nil
 		}
-		if dataRec.Tombstone {
-			offset += 21 + int64(len(dataRec.Key))
-		} else {
-			offset += 29 + int64(len(dataRec.Key)) + int64(len(dataRec.Value))
-		}
 	}
 }
 
 // WriteMerged merges db1 and db2 and writes the result to db.
 // It also sets the size of the new data block.
 // Returns the number of records in the merged data block.
-func (db *DataBlock) WriteMerged(db1, db2 *DataBlock) (uint, error) {
+func (db *DataBlock) WriteMerged(db1, db2 *DataBlock, compressionDict *compression.Dictionary) (uint, error) {
 	file, err := os.OpenFile(db.Filename, os.O_WRONLY, 0644)
 	if err != nil {
 		return 0, err
@@ -333,11 +359,11 @@ func (db *DataBlock) WriteMerged(db1, db2 *DataBlock) (uint, error) {
 	}
 	defer file2.Close()
 
-	rec1, err := db1.getNextRecord(file1)
+	rec1, err := db1.getNextRecord(file1, compressionDict)
 	if err != nil {
 		return 0, err
 	}
-	rec2, err := db2.getNextRecord(file2)
+	rec2, err := db2.getNextRecord(file2, compressionDict)
 	if err != nil {
 		return 0, err
 	}
@@ -347,66 +373,66 @@ func (db *DataBlock) WriteMerged(db1, db2 *DataBlock) (uint, error) {
 		if rec1 == nil && rec2 == nil {
 			break
 		} else if rec1 == nil {
-			err = db.writeRecord(file, rec2)
+			err = db.writeRecord(file, rec2, compressionDict)
 			if err != nil {
 				return cnt, err
 			}
-			rec2, err = db2.getNextRecord(file2)
+			rec2, err = db2.getNextRecord(file2, compressionDict)
 			if err != nil {
 				return cnt, err
 			}
 		} else if rec2 == nil {
-			err = db.writeRecord(file, rec1)
+			err = db.writeRecord(file, rec1, compressionDict)
 			if err != nil {
 				return cnt, err
 			}
-			rec1, err = db1.getNextRecord(file1)
+			rec1, err = db1.getNextRecord(file1, compressionDict)
 			if err != nil {
 				return cnt, err
 			}
 		} else {
 			cmp := bytesUtil.Compare(rec1.Key, rec2.Key)
 			if cmp < 0 {
-				err = db.writeRecord(file, rec1)
+				err = db.writeRecord(file, rec1, compressionDict)
 				if err != nil {
 					return cnt, err
 				}
-				rec1, err = db1.getNextRecord(file1)
+				rec1, err = db1.getNextRecord(file1, compressionDict)
 				if err != nil {
 					return cnt, err
 				}
 			} else if cmp > 0 {
-				err = db.writeRecord(file, rec2)
+				err = db.writeRecord(file, rec2, compressionDict)
 				if err != nil {
 					return cnt, err
 				}
-				rec2, err = db2.getNextRecord(file2)
+				rec2, err = db2.getNextRecord(file2, compressionDict)
 				if err != nil {
 					return cnt, err
 				}
 			} else if rec1.Timestamp > rec2.Timestamp {
-				err = db.writeRecord(file, rec1)
+				err = db.writeRecord(file, rec1, compressionDict)
 				if err != nil {
 					return cnt, err
 				}
-				rec1, err = db1.getNextRecord(file1)
+				rec1, err = db1.getNextRecord(file1, compressionDict)
 				if err != nil {
 					return cnt, err
 				}
-				rec2, err = db2.getNextRecord(file2)
+				rec2, err = db2.getNextRecord(file2, compressionDict)
 				if err != nil {
 					return cnt, err
 				}
 			} else {
-				err = db.writeRecord(file, rec2)
+				err = db.writeRecord(file, rec2, compressionDict)
 				if err != nil {
 					return cnt, err
 				}
-				rec1, err = db1.getNextRecord(file1)
+				rec1, err = db1.getNextRecord(file1, compressionDict)
 				if err != nil {
 					return cnt, err
 				}
-				rec2, err = db2.getNextRecord(file2)
+				rec2, err = db2.getNextRecord(file2, compressionDict)
 				if err != nil {
 					return cnt, err
 				}

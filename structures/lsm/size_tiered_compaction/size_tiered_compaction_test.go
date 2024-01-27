@@ -31,19 +31,19 @@ func TestCompact(t *testing.T) {
 		{Key: []byte("key2"), Value: []byte("value2"), Timestamp: 2},
 	}
 
-	sstable1, err := sstable.CreateSSTable(recs, config)
+	sstable1, err := sstable.CreateSSTable(recs, nil, config)
 	if err != nil {
 		fmt.Println(sstable1)
 	}
-	sstable2, err := sstable.CreateSSTable(recs, config)
+	sstable2, err := sstable.CreateSSTable(recs, nil, config)
 	if err != nil {
 		fmt.Println(sstable2)
 	}
-	sstable3, err := sstable.CreateSSTable(recs, config)
+	sstable3, err := sstable.CreateSSTable(recs, nil, config)
 	if err != nil {
 		fmt.Println(sstable3)
 	}
-	sstable4, err := sstable.CreateSSTable(recs, config)
+	sstable4, err := sstable.CreateSSTable(recs, nil, config)
 	if err != nil {
 		fmt.Println(sstable4)
 	}
@@ -51,7 +51,7 @@ func TestCompact(t *testing.T) {
 		MaxLevel:            3,
 		MaxLsmNodesPerLevel: 2,
 	}
-	Compact(config, lsmConfig)
+	Compact(nil, config, lsmConfig)
 	// Check if compaction has been performed correctly
 
 	// Example assertion: Check if the number of SSTables in the first level is as expected after compaction.

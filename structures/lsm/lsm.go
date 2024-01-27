@@ -3,6 +3,7 @@ package lsm
 import (
 	"fmt"
 	"nasp-project/model"
+	"nasp-project/structures/compression"
 	"nasp-project/structures/lsm/size_tiered_compaction"
 	"nasp-project/structures/sstable"
 	"nasp-project/util"
@@ -15,7 +16,7 @@ import (
 // The returned record is from the lowest LSM Tree level that contains the record.
 // If the record is found in multiple same-level SSTables, the record with the latest timestamp is returned.
 // Returns an error if the read fails.
-func Read(key []byte, config *util.Config) (*model.Record, error) {
+func Read(key []byte, compressionDict *compression.Dictionary, config *util.Config) (*model.Record, error) {
 	for lvl := 1; lvl <= config.LSMTree.MaxLevel; lvl++ {
 		lvlLabel := fmt.Sprintf("L%03d", lvl)
 		path := filepath.Join(config.SSTable.SavePath, lvlLabel, "TOC")
@@ -36,7 +37,7 @@ func Read(key []byte, config *util.Config) (*model.Record, error) {
 			if err != nil {
 				return nil, err
 			}
-			rec, err := table.Read(key)
+			rec, err := table.Read(key, compressionDict)
 			if err != nil {
 				return nil, err
 			}
@@ -58,10 +59,10 @@ func Read(key []byte, config *util.Config) (*model.Record, error) {
 // Compact compacts the LSM tree by merging SSTables from the same level.
 // Runs compaction only if the compaction start condition is met.
 // The compaction algorithm used is determined by the config.
-func Compact(config *util.LSMTreeConfig, sstConfig *util.SSTableConfig) error {
+func Compact(compressionDict *compression.Dictionary, config *util.LSMTreeConfig, sstConfig *util.SSTableConfig) error {
 	if config.CompactionAlgorithm == "Size-Tiered" {
 		// TODO: Add condition for compaction call
-		size_tiered_compaction.Compact(sstConfig, config)
+		size_tiered_compaction.Compact(compressionDict, sstConfig, config)
 	} else if config.CompactionAlgorithm == "Leveled" {
 		// TODO: Add condition for compaction call
 		// TODO: Implement
