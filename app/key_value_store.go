@@ -46,6 +46,9 @@ func (kvs *KeyValueStore) Get(key string) ([]byte, error) {
 	if kvs.rateLimitReached() {
 		return nil, errors.New("rate limit reached")
 	}
+	if util.IsReservedKey([]byte(key)) {
+		return nil, errors.New("reserved key")
+	}
 	return kvs.get(key)
 }
 
@@ -55,6 +58,9 @@ func (kvs *KeyValueStore) Put(key string, value []byte) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
+	if util.IsReservedKey([]byte(key)) {
+		return errors.New("reserved key")
+	}
 	return kvs.put(key, value)
 }
 
@@ -63,6 +69,9 @@ func (kvs *KeyValueStore) Put(key string, value []byte) error {
 func (kvs *KeyValueStore) Delete(key string) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
+	}
+	if util.IsReservedKey([]byte(key)) {
+		return errors.New("reserved key")
 	}
 	return kvs.delete(key)
 }
