@@ -266,3 +266,24 @@ func (mts *Memtables) PrefixScan(prefix []byte) []*model.Record {
 
 	return records
 }
+
+func (mts *Memtables) Reconstruct(records []*model.Record, walIndex []uint32, walOffset []uint64) ([]uint32, []uint64, error) {
+	fileIndexes := make([]uint32, 0)
+	byteOffsets := make([]uint64, 0)
+
+	for idx, record := range records {
+		mt := mts.tables[mts.currentIndex]
+		if mt.structure.IsFull() {
+			fileIndexes = append(fileIndexes, walIndex[idx])
+			byteOffsets = append(byteOffsets, walOffset[idx])
+			mts.currentIndex = (mts.currentIndex + 1) % mts.maxTables
+			mt = mts.tables[mts.currentIndex]
+		}
+		err := mt.structure.Add(record)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return fileIndexes, byteOffsets, nil
+}
