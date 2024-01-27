@@ -3,9 +3,8 @@ package app
 import (
 	"errors"
 	"nasp-project/structures/hyperloglog"
+	"nasp-project/util"
 )
-
-const HyperLogLog = "HLL_"
 
 // NewHLL creates a new hyperloglog record with specified key.
 // Returns an error if the write fails or the rate limit is reached.
@@ -13,7 +12,7 @@ func (kvs *KeyValueStore) NewHLL(key string, p uint32) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
-	key = HyperLogLog + key
+	key = util.HyperLogLogPrefix + key
 	hll := hyperloglog.NewHyperLogLog(p)
 	return kvs.put(key, hll.Serialize())
 }
@@ -24,7 +23,7 @@ func (kvs *KeyValueStore) DeleteHLL(key string) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
-	key = HyperLogLog + key
+	key = util.HyperLogLogPrefix + key
 	return kvs.delete(key)
 }
 
@@ -34,7 +33,7 @@ func (kvs *KeyValueStore) HLLAdd(key string, val []byte) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
-	key = HyperLogLog + key
+	key = util.HyperLogLogPrefix + key
 	hllBytes, err := kvs.get(key)
 	if err != nil {
 		return err
@@ -53,7 +52,7 @@ func (kvs *KeyValueStore) HLLEstimate(key string) (float64, error) {
 	if kvs.rateLimitReached() {
 		return -1, errors.New("rate limit reached")
 	}
-	key = HyperLogLog + key
+	key = util.HyperLogLogPrefix + key
 	hllBytes, err := kvs.get(key)
 	if err != nil {
 		return -1, err
