@@ -6,10 +6,8 @@ import (
 	"nasp-project/util"
 )
 
-const ConfigPath = "config.yaml"
-
 func main() {
-	config := util.LoadConfig(ConfigPath)
+	config := util.LoadConfig(util.ConfigPath)
 
 	db, err := app.NewKeyValueStore(config)
 	if err != nil {
