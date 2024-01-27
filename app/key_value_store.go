@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-const ConfigPath = "config.yaml"
-
 type KeyValueStore struct {
 	config    *util.Config
 	wal       *writeaheadlog.WAL
@@ -22,10 +20,8 @@ type KeyValueStore struct {
 }
 
 // NewKeyValueStore creates an instance of Key-Value Storage engine with configuration given at ConfigPath.
-func NewKeyValueStore() (*KeyValueStore, error) {
-	config := util.LoadConfig(ConfigPath)
-
-	wal, err := writeaheadlog.NewWAL(config.WAL.BufferSize, config.WAL.SegmentSize)
+func NewKeyValueStore(config *util.Config) (*KeyValueStore, error) {
+	wal, err := writeaheadlog.NewWAL(config.WAL, config.Memtable.Instances)
 	if err != nil {
 		return nil, err
 	}
@@ -50,6 +46,9 @@ func (kvs *KeyValueStore) Get(key string) ([]byte, error) {
 	if kvs.rateLimitReached() {
 		return nil, errors.New("rate limit reached")
 	}
+	if util.IsReservedKey([]byte(key)) {
+		return nil, errors.New("reserved key")
+	}
 	return kvs.get(key)
 }
 
@@ -58,6 +57,9 @@ func (kvs *KeyValueStore) Get(key string) ([]byte, error) {
 func (kvs *KeyValueStore) Put(key string, value []byte) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
+	}
+	if util.IsReservedKey([]byte(key)) {
+		return errors.New("reserved key")
 	}
 	return kvs.put(key, value)
 }
@@ -68,6 +70,9 @@ func (kvs *KeyValueStore) Delete(key string) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
+	if util.IsReservedKey([]byte(key)) {
+		return errors.New("reserved key")
+	}
 	return kvs.delete(key)
 }
 
@@ -75,8 +80,14 @@ func (kvs *KeyValueStore) Delete(key string) error {
 // Implements complete read-path: Memtable -> Cache -> SSTable
 // Returns nil if the key is not found.
 // Returns an error if the read fails.
+// If the compression is turned on, might make up to a total of two get calls.
 func (kvs *KeyValueStore) get(key string) ([]byte, error) {
 	keyBytes := []byte(key)
+
+	compressionDict, err := kvs.getCompressionDict(key)
+	if err != nil {
+		return nil, err
+	}
 
 	rec, err := kvs.memtables.Get(keyBytes)
 	if err == nil && rec != nil {
@@ -94,7 +105,7 @@ func (kvs *KeyValueStore) get(key string) ([]byte, error) {
 		return rec.Value, nil
 	}
 
-	rec, err = lsm.Read(keyBytes, kvs.config)
+	rec, err = lsm.Read(keyBytes, compressionDict, kvs.config)
 	if err != nil {
 		return nil, err
 	}
@@ -115,6 +126,7 @@ func (kvs *KeyValueStore) get(key string) ([]byte, error) {
 // If the Memtable is full it flushes its contents into SSTable.
 // A flush can trigger an LSM Tree compaction if the condition is met.
 // Returns an error if the write fails.
+// If the compression is turned on, might make up to a total of one get and two put calls.
 func (kvs *KeyValueStore) put(key string, value []byte) error {
 	record := &model.Record{
 		Key:       []byte(key),
@@ -123,22 +135,30 @@ func (kvs *KeyValueStore) put(key string, value []byte) error {
 		Timestamp: uint64(time.Now().Unix()),
 	}
 
+	compressionDict, err := kvs.updateCompressionDict(key)
+	if err != nil {
+		return err
+	}
+
 	kvs.wal.PutCommit(key, value)
 
 	if kvs.memtables.IsFull() {
-		recs := kvs.memtables.Flush()
+		recs, flushedIdx := kvs.memtables.Flush()
 
-		_, err := sstable.CreateSSTable(recs, &kvs.config.SSTable)
+		_, err := sstable.CreateSSTable(recs, compressionDict, &kvs.config.SSTable)
 		if err != nil {
 			return err
 		}
 
-		err = lsm.Compact(&kvs.config.LSMTree, &kvs.config.SSTable)
+		err = lsm.Compact(compressionDict, &kvs.config.LSMTree, &kvs.config.SSTable)
 		if err != nil {
 			return err
 		}
 
-		// TODO: Delete WAL records
+		err = kvs.wal.FlushedMemtable(flushedIdx)
+		if err != nil {
+			return err
+		}
 
 		for _, rec := range recs {
 			if kvs.cache.Get(string(rec.Key)) != nil {
@@ -147,7 +167,7 @@ func (kvs *KeyValueStore) put(key string, value []byte) error {
 		}
 	}
 
-	err := kvs.memtables.Add(record)
+	err = kvs.memtables.Add(record)
 	if err != nil {
 		return err
 	}

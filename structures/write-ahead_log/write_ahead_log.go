@@ -84,7 +84,7 @@ func NewWAL(walConfig util.WALConfig, instances int) (*WAL, error) {
 
 	dirEntries, err := os.ReadDir(logsPath)
 	if os.IsNotExist(err) {
-		err := os.MkdirAll(logsPath, os.ModeDir)
+		err := os.MkdirAll(logsPath, 0777)
 		if err != nil {
 			return nil, err
 		}

@@ -126,12 +126,13 @@ func (mts *Memtables) IsFull() bool {
 	return mts.tables[mts.currentIndex].structure.IsFull() && (mts.currentIndex+1)%mts.maxTables == mts.lastIndex
 }
 
-// Flush returns all records from the last memtable, clears the memtable and rotates accordingly.
-func (mts *Memtables) Flush() []model.Record {
-	records := mts.tables[mts.lastIndex].structure.Flush()
-	mts.tables[mts.lastIndex].structure.Clear()
+// Flush returns all records from the last memtable and last table index, clears the memtable and rotates accordingly.
+func (mts *Memtables) Flush() ([]model.Record, int) {
+	flushIdx := mts.lastIndex
+	records := mts.tables[flushIdx].structure.Flush()
+	mts.tables[flushIdx].structure.Clear()
 	mts.lastIndex = (mts.lastIndex + 1) % mts.maxTables
-	return records
+	return records, flushIdx
 }
 
 func (mts *Memtables) GetIterators() []util.Iterator {

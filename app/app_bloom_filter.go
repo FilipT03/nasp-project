@@ -3,9 +3,8 @@ package app
 import (
 	"errors"
 	"nasp-project/structures/bloom_filter"
+	"nasp-project/util"
 )
-
-const BloomFilterPrefix = "BF_"
 
 // NewBF creates a new bloom filter record with specified key.
 // Size of the bitset and number of hash functions calculated based on
@@ -15,7 +14,7 @@ func (kvs *KeyValueStore) NewBF(key string, n uint, p float64) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
-	key = BloomFilterPrefix + key
+	key = util.BloomFilterPrefix + key
 	bf := bloom_filter.NewBloomFilter(n, p)
 	return kvs.put(key, bf.Serialize())
 }
@@ -26,7 +25,7 @@ func (kvs *KeyValueStore) DeleteBF(key string) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
-	key = BloomFilterPrefix + key
+	key = util.BloomFilterPrefix + key
 	return kvs.delete(key)
 }
 
@@ -37,7 +36,7 @@ func (kvs *KeyValueStore) BFAdd(key string, val []byte) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
-	key = BloomFilterPrefix + key
+	key = util.BloomFilterPrefix + key
 
 	bfBytes, err := kvs.get(key)
 	if err != nil {
@@ -60,7 +59,7 @@ func (kvs *KeyValueStore) BFHasKey(key string, val []byte) (bool, error) {
 	if kvs.rateLimitReached() {
 		return false, errors.New("rate limit reached")
 	}
-	key = BloomFilterPrefix + key
+	key = util.BloomFilterPrefix + key
 
 	bfBytes, err := kvs.get(key)
 	if err != nil {

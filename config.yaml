@@ -1,6 +1,7 @@
 WAL:
     segmentSize: 32768
     bufferSize: 8
+    walFolderPath: ./wal
 Memtable:
     maxSize: 1024
     structure: SkipList # SkipList, HashMap, BTree
@@ -14,7 +15,7 @@ SSTable:
     singleFile: false
     summaryDegree: 5
     indexDegree: 5
-    compression: false
+    compression: true
     filterPrecision: 0.01
     merkleTreeChunkSize: 1024
 LSMTree:
