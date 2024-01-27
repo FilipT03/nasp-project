@@ -120,7 +120,7 @@ func addPrefix(mts *Memtables) {
 	_ = mts.Add(&model.Record{
 		Key:       []byte("aab"),
 		Value:     nil,
-		Tombstone: false,
+		Tombstone: true,
 		Timestamp: 12,
 	})
 	_ = mts.Add(&model.Record{
@@ -171,7 +171,7 @@ func addPrefix(mts *Memtables) {
 	_ = mts.Add(&model.Record{
 		Key:       []byte("aab"),
 		Value:     nil,
-		Tombstone: false,
+		Tombstone: true,
 		Timestamp: 5,
 	})
 	_ = mts.Add(&model.Record{
@@ -203,7 +203,6 @@ func addPrefix(mts *Memtables) {
 }
 
 func addRange(mts *Memtables) {
-
 	_ = mts.Add(&model.Record{
 		Key:       []byte("1"),
 		Value:     nil,
@@ -219,7 +218,7 @@ func addRange(mts *Memtables) {
 	_ = mts.Add(&model.Record{
 		Key:       []byte("4"),
 		Value:     nil,
-		Tombstone: false,
+		Tombstone: true,
 		Timestamp: 0,
 	})
 
@@ -316,12 +315,6 @@ func testValidRangeScan(structure string, t *testing.T) {
 			Timestamp: 5,
 		},
 		{
-			Key:       []byte("4"),
-			Value:     nil,
-			Tombstone: false,
-			Timestamp: 0,
-		},
-		{
 			Key:       []byte("5"),
 			Value:     nil,
 			Tombstone: false,
@@ -341,8 +334,8 @@ func testValidRangeScan(structure string, t *testing.T) {
 		},
 	}
 
-	if len(records) != 6 {
-		t.Errorf("error: [%s] records size to be 6, got %d", structure, len(records))
+	if len(records) != 5 {
+		t.Errorf("error: [%s] records size to be 5, got %d", structure, len(records))
 		return
 	}
 
@@ -392,12 +385,6 @@ func testValidPrefixScan(structure string, t *testing.T) {
 	records := mts.PrefixScan([]byte("aab"))
 	sol := []model.Record{
 		{
-			Key:       []byte("aab"),
-			Value:     nil,
-			Tombstone: false,
-			Timestamp: 12,
-		},
-		{
 			Key:       []byte("aabaa"),
 			Value:     nil,
 			Tombstone: false,
@@ -441,8 +428,8 @@ func testValidPrefixScan(structure string, t *testing.T) {
 		},
 	}
 
-	if len(records) != 8 {
-		t.Errorf("error: [%s] expected records size to be 8, got %d", structure, len(records))
+	if len(records) != 7 {
+		t.Errorf("error: [%s] expected records size to be 7, got %d", structure, len(records))
 	}
 
 	for i, record := range records {
@@ -479,4 +466,120 @@ func TestInvalidPrefixScan(t *testing.T) {
 	testInvalidPrefixScan("HashMap", t)
 	testInvalidPrefixScan("BTree", t)
 	testInvalidPrefixScan("SkipList", t)
+}
+
+func addReserved(mts *Memtables) {
+	_ = mts.Add(&model.Record{
+		Key:       []byte(util.BloomFilterPrefix + "mojfilter"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+	_ = mts.Add(&model.Record{
+		Key:       []byte(util.HyperLogLogPrefix + "mojhajperloglog"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+	_ = mts.Add(&model.Record{
+		Key:       []byte("__a"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+
+	_ = mts.Add(&model.Record{
+		Key:       []byte(util.SimHashPrefix + "mojsimhes"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 3,
+	})
+	_ = mts.Add(&model.Record{
+		Key:       []byte("__Hll"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+	_ = mts.Add(&model.Record{
+		Key:       []byte(util.CountMinSketchPrefix + "mojcms"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+
+	_ = mts.Add(&model.Record{
+		Key:       []byte("adasda"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+	_ = mts.Add(&model.Record{
+		Key:       []byte("babva"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+	_ = mts.Add(&model.Record{
+		Key:       []byte("352523"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 5,
+	})
+
+	_ = mts.Add(&model.Record{
+		Key:       []byte("dasda"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 0,
+	})
+	_ = mts.Add(&model.Record{
+		Key:       []byte("basd"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 4,
+	})
+	_ = mts.Add(&model.Record{
+		Key:       []byte(util.RateLimiterKey),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 3,
+	})
+
+	_ = mts.Add(&model.Record{
+		Key:       []byte("_a_a"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 2,
+	})
+	_ = mts.Add(&model.Record{
+		Key:       []byte("_CMS"),
+		Value:     nil,
+		Tombstone: false,
+		Timestamp: 1,
+	})
+
+}
+func testReservedScan(structure string, t *testing.T) {
+	util.GetConfig().Memtable.MaxSize = 3
+	util.GetConfig().Memtable.Instances = 5
+	util.GetConfig().Memtable.Structure = structure
+	mts := CreateMemtables(&util.GetConfig().Memtable)
+	addReserved(mts)
+
+	recordsPrefix := mts.PrefixScan([]byte("_"))
+	recordsRange := mts.RangeScan([]byte("_"), []byte("b"))
+
+	if len(recordsPrefix) != 4 {
+		t.Errorf("error: [Prefix Scan] [%s] expected records size to be 4, got %d", structure, len(recordsPrefix))
+	}
+
+	if len(recordsRange) != 5 {
+		t.Errorf("error: [Range Scan] [%s] expected records size to be 4, got %d", structure, len(recordsRange))
+	}
+}
+
+func TestReservedScan(t *testing.T) {
+	testReservedScan("HashMap", t)
+	testReservedScan("BTree", t)
+	testReservedScan("SkipList", t)
 }

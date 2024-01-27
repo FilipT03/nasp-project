@@ -153,6 +153,11 @@ func isMinimalKey(iter util.Iterator, minKey []byte, maxTimestamp uint64) bool {
 		(bytes.Equal(iter.Value().Key, minKey) && iter.Value().Timestamp > maxTimestamp))
 }
 
+// isInvalidKey checks if the key has its tombstone set to true or if it is a reserved word.
+func isInvalidKey(iter util.Iterator) bool {
+	return iter != nil && iter.Value() != nil && (iter.Value().Tombstone || util.IsReservedKey(iter.Value().Key))
+}
+
 // RangeScan returns records from memtables within the inclusive range [minValue, maxValue].
 func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Record {
 	iterators := mts.GetIterators()
@@ -176,6 +181,9 @@ func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Recor
 		maxTimestamp := uint64(0)
 
 		for i, iter := range iterators {
+			for isInvalidKey(iter) {
+				iter.Next()
+			}
 			if isMinimalKey(iter, minKey, maxTimestamp) {
 				minIndex = i
 				minKey = iter.Value().Key
@@ -192,8 +200,10 @@ func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Recor
 				iterators[minIndex] = nil
 				continue
 			}
-			records = append(records, iterators[minIndex].Value())
-			seenValues[string(minKey)] = true
+			if !util.IsReservedKey(minKey) {
+				records = append(records, iterators[minIndex].Value())
+				seenValues[string(minKey)] = true
+			}
 		}
 
 		if !iterators[minIndex].Next() || bytes.Compare(iterators[minIndex].Value().Key, maxValue) > 0 {
@@ -203,9 +213,13 @@ func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Recor
 	return records
 }
 
+// PrefixScan returns records from memtables that have the specified prefix.
 func (mts *Memtables) PrefixScan(prefix []byte) []*model.Record {
-	iterators := mts.GetIterators()
 	records := make([]*model.Record, 0)
+	if util.IsReservedKey(prefix) {
+		return records
+	}
+	iterators := mts.GetIterators()
 
 	// Set all iterators to first key with prefix.
 	for i := 0; i < len(iterators); i++ {
@@ -224,6 +238,9 @@ func (mts *Memtables) PrefixScan(prefix []byte) []*model.Record {
 		maxTimestamp := uint64(0)
 
 		for i, iter := range iterators {
+			for isInvalidKey(iter) {
+				iter.Next()
+			}
 			if isMinimalKey(iter, minKey, maxTimestamp) {
 				minIndex = i
 				minKey = iter.Value().Key
@@ -244,7 +261,7 @@ func (mts *Memtables) PrefixScan(prefix []byte) []*model.Record {
 			seenValues[string(minKey)] = true
 		}
 
-		if !iterators[minIndex].Next() || !bytes.HasPrefix(iterators[minIndex].Value().Key, prefix) {
+		if !iterators[minIndex].Next() {
 			iterators[minIndex] = nil
 		}
 	}
