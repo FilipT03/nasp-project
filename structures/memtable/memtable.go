@@ -135,7 +135,7 @@ func (mts *Memtables) Flush() ([]model.Record, int) {
 	return records, flushIdx
 }
 
-func (mts *Memtables) getIterators() []util.Iterator {
+func (mts *Memtables) GetIterators() []util.Iterator {
 	iterators := make([]util.Iterator, 0)
 	for i := 0; i < mts.maxTables; i++ {
 		mt := mts.tables[i]
@@ -149,7 +149,7 @@ func (mts *Memtables) getIterators() []util.Iterator {
 
 // RangeScan returns records from memtables within the inclusive range [minValue, maxValue].
 func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Record {
-	iterators := mts.getIterators()
+	iterators := mts.GetIterators()
 	records := make([]*model.Record, 0)
 
 	// Set all iterators to minValue (or first value greater than minValue)
