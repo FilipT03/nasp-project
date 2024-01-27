@@ -147,6 +147,12 @@ func (mts *Memtables) GetIterators() []util.Iterator {
 	return iterators
 }
 
+// isMinimalKey checks if the key obtained from the iterator is smaller than the current minimal key.
+func isMinimalKey(iter util.Iterator, minKey []byte, maxTimestamp uint64) bool {
+	return iter != nil && iter.Value() != nil && (bytes.Compare(iter.Value().Key, minKey) < 0 ||
+		(bytes.Equal(iter.Value().Key, minKey) && iter.Value().Timestamp > maxTimestamp))
+}
+
 // RangeScan returns records from memtables within the inclusive range [minValue, maxValue].
 func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Record {
 	iterators := mts.GetIterators()
@@ -170,8 +176,7 @@ func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Recor
 		maxTimestamp := uint64(0)
 
 		for i, iter := range iterators {
-			if iter != nil && iter.Value() != nil && (bytes.Compare(iter.Value().Key, minKey) < 0 ||
-				(bytes.Equal(iter.Value().Key, minKey) && iter.Value().Timestamp > maxTimestamp)) {
+			if isMinimalKey(iter, minKey, maxTimestamp) {
 				minIndex = i
 				minKey = iter.Value().Key
 				maxTimestamp = iter.Value().Timestamp
@@ -198,6 +203,51 @@ func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Recor
 	return records
 }
 
-func (mts *Memtables) PrefixScan(prefix string) []*model.Record {
-	panic("TODO - Implement prefix scan")
+func (mts *Memtables) PrefixScan(prefix []byte) []*model.Record {
+	iterators := mts.GetIterators()
+	records := make([]*model.Record, 0)
+
+	// Set all iterators to first key with prefix.
+	for i := 0; i < len(iterators); i++ {
+		current := iterators[i]
+		for !bytes.HasPrefix(current.Value().Key, prefix) {
+			if !current.Next() {
+				break
+			}
+		}
+	}
+
+	seenValues := make(map[string]bool)
+	for {
+		minIndex := -1
+		minKey := []byte{255}
+		maxTimestamp := uint64(0)
+
+		for i, iter := range iterators {
+			if isMinimalKey(iter, minKey, maxTimestamp) {
+				minIndex = i
+				minKey = iter.Value().Key
+				maxTimestamp = iter.Value().Timestamp
+			}
+		}
+
+		if minIndex == -1 {
+			break
+		}
+
+		if !seenValues[string(minKey)] {
+			if !bytes.HasPrefix(iterators[minIndex].Value().Key, prefix) {
+				iterators[minIndex] = nil
+				continue
+			}
+			records = append(records, iterators[minIndex].Value())
+			seenValues[string(minKey)] = true
+		}
+
+		if !iterators[minIndex].Next() || !bytes.HasPrefix(iterators[minIndex].Value().Key, prefix) {
+			iterators[minIndex] = nil
+		}
+	}
+
+	return records
 }
