@@ -169,7 +169,76 @@ func (db *DataBlock) writeRecord(file *os.File, rec *DataRecord) error {
 	return nil
 }
 
+// writeRecordLen writes a record to the data block file and returns the number of bytes written.
+func (db *DataBlock) writeRecordLen(file *os.File, rec *DataRecord) (int, error) {
+	size := 0
+
+	bytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(bytes, rec.CRC)
+	_, err := file.Write(bytes)
+	if err != nil {
+		return size, err
+	}
+	size += 4
+
+	bytes = make([]byte, 8)
+	binary.LittleEndian.PutUint64(bytes, rec.Timestamp)
+	_, err = file.Write(bytes)
+	if err != nil {
+		return size, err
+	}
+	size += 8
+
+	if rec.Tombstone {
+		_, err = file.Write([]byte{1})
+		if err != nil {
+			return size, err
+		}
+	} else {
+		_, err = file.Write([]byte{0})
+		if err != nil {
+			return size, err
+		}
+	}
+	size += 1
+
+	bytes = make([]byte, 8)
+	binary.LittleEndian.PutUint64(bytes, uint64(len(rec.Key)))
+	_, err = file.Write(bytes)
+	if err != nil {
+		return size, err
+	}
+	size += 8
+
+	if !rec.Tombstone {
+		bytes = make([]byte, 8)
+		binary.LittleEndian.PutUint64(bytes, uint64(len(rec.Value)))
+		_, err = file.Write(bytes)
+		if err != nil {
+			return size, err
+		}
+		size += 8
+	}
+
+	_, err = file.Write(rec.Key)
+	if err != nil {
+		return size, err
+	}
+	size += len(rec.Key)
+
+	if !rec.Tombstone {
+		_, err = file.Write(rec.Value)
+		if err != nil {
+			return size, err
+		}
+		size += len(rec.Value)
+	}
+
+	return size, nil
+}
+
 // getNextRecord assumes the provided file is at the start of the record and reads the next record.
+// Returns nil if the end of file is reached.
 func getNextRecord(file *os.File) (*DataRecord, error) {
 	bytes := make([]byte, 4)
 	rl, err := file.Read(bytes)
@@ -292,6 +361,80 @@ func (db *DataBlock) GetRecordWithKeyFromOffset(key []byte, offset int64) (*Data
 			offset += 29 + int64(len(dataRec.Key)) + int64(len(dataRec.Value))
 		}
 	}
+}
+
+// DataRecordGenerator is used for iterating over a list of all records from consecutive data blocks.
+// Use GetNextRecord method to return next record, starting from the first one.
+// Please remember to call Clear too free up resources after the usage.
+type DataRecordGenerator struct {
+	blocks     []*DataBlock
+	blockPtr   int      // index of the block with the next record
+	file       *os.File // currently open data block file
+	reachedEnd bool     // true if there are no more records to be read
+}
+
+// NewDataRecordGenerator creates a DataRecordGenerator for the given blocks.
+func NewDataRecordGenerator(blocks []*DataBlock) (*DataRecordGenerator, error) {
+	var firstFile *os.File
+	var reachedEnd = false
+	if len(blocks) < 1 {
+		firstFile = nil
+		reachedEnd = true
+	} else {
+		tmpFileVariable, err := os.Open(blocks[0].Filename) // I hate GO.
+		if err != nil {
+			return nil, err
+		}
+		firstFile = tmpFileVariable
+	}
+	return &DataRecordGenerator{
+		blocks:     blocks,
+		blockPtr:   0,
+		file:       firstFile,
+		reachedEnd: reachedEnd,
+	}, nil
+}
+
+// GetNextRecord returns the next record from the data block sequence, or nil if the end is reached.
+func (gen *DataRecordGenerator) GetNextRecord() (*DataRecord, error) {
+	if gen.reachedEnd {
+		return nil, nil
+	}
+	nextRec, err := getNextRecord(gen.file)
+	if err != nil {
+		return nil, err
+	}
+	if nextRec == nil {
+		gen.file.Close()
+		gen.blockPtr++
+		if gen.blockPtr >= len(gen.blocks) {
+			gen.reachedEnd = true
+			gen.file = nil
+			return nil, nil
+		}
+		gen.file, err = os.Open(gen.blocks[gen.blockPtr].Filename)
+		if err != nil {
+			return nil, err
+		}
+		return gen.GetNextRecord()
+	}
+	return nextRec, nil
+}
+
+// Clear frees up resources that the DataRecordGenerator uses.
+// After the call to Clear, each next call of GetNextRecord will return nil.
+func (gen *DataRecordGenerator) Clear() error {
+	gen.blocks = nil
+	gen.blockPtr = 0
+	if gen.file != nil {
+		err := gen.file.Close()
+		if err != nil {
+			return err
+		}
+		gen.file = nil
+	}
+	gen.reachedEnd = true
+	return nil
 }
 
 // WriteMerged merges db1 and db2 and writes the result to db.
