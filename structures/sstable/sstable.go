@@ -151,6 +151,10 @@ func CreateSSTable(records []model.Record, compressionDict *compression.Dictiona
 	files := sstable.toBinaryFiles()
 	merkleTree := merkle_tree.NewMerkleTree(files, config.MerkleTreeChunkSize)
 	file, err := os.Create(sstable.MetadataFilename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
 	_, err = file.WriteString(merkleTree.Serialize())
 	if err != nil {
 		return nil, err
@@ -605,6 +609,10 @@ func (sst *SSTable) BuildFromDataBlock(numRecords uint, compressionDict *compres
 	files := sst.toBinaryFiles()
 	merkleTree := merkle_tree.NewMerkleTree(files, config.MerkleTreeChunkSize)
 	file, err := os.Create(sst.MetadataFilename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 	_, err = file.WriteString(merkleTree.Serialize())
 	if err != nil {
 		return err
