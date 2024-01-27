@@ -3,9 +3,8 @@ package app
 import (
 	"errors"
 	count_min_sketch "nasp-project/structures/count-min-sketch"
+	"nasp-project/util"
 )
-
-const CountMinSketchPrefix = "CMS_"
 
 // NewCMS creates a new count-min sketch record with specified key.
 // Returns an error if the write fails or the rate limit is reached.
@@ -13,7 +12,7 @@ func (kvs *KeyValueStore) NewCMS(key string, epsilon float64, delta float64) err
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
-	key = CountMinSketchPrefix + key
+	key = util.CountMinSketchPrefix + key
 	cms := count_min_sketch.NewCMS(epsilon, delta)
 	return kvs.put(key, cms.Serialize())
 }
@@ -24,7 +23,7 @@ func (kvs *KeyValueStore) DeleteCMS(key string) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
-	key = CountMinSketchPrefix + key
+	key = util.CountMinSketchPrefix + key
 	return kvs.delete(key)
 }
 
@@ -34,7 +33,7 @@ func (kvs *KeyValueStore) CMSAdd(key string, val []byte) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
-	key = CountMinSketchPrefix + key
+	key = util.CountMinSketchPrefix + key
 	CMSBytes, err := kvs.get(key)
 	if err != nil {
 		return err
@@ -54,7 +53,7 @@ func (kvs *KeyValueStore) CMSGet(key string, val []byte) (int, error) {
 	if kvs.rateLimitReached() {
 		return -1, errors.New("rate limit reached")
 	}
-	key = CountMinSketchPrefix + key
+	key = util.CountMinSketchPrefix + key
 	CMSBytes, err := kvs.get(key)
 	if err != nil {
 		return -1, err

@@ -3,16 +3,15 @@ package app
 import (
 	"errors"
 	"nasp-project/structures/sim_hash"
+	"nasp-project/util"
 )
-
-const SimHashPrefix = "SH_"
 
 // SHAddFingerprint calculates fingerprint of the given text and stores it in the database with the specified key.
 func (kvs *KeyValueStore) SHAddFingerprint(key string, text string) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
-	key = SimHashPrefix + key
+	key = util.SimHashPrefix + key
 	shFingerprint, err := sim_hash.SimHashText(text)
 	if err != nil {
 		return err
@@ -26,7 +25,7 @@ func (kvs *KeyValueStore) SHDeleteFingerprint(key string) error {
 	if kvs.rateLimitReached() {
 		return errors.New("rate limit reached")
 	}
-	key = SimHashPrefix + key
+	key = util.SimHashPrefix + key
 	return kvs.delete(key)
 }
 
@@ -35,8 +34,8 @@ func (kvs *KeyValueStore) SHGetHammingDistance(key1 string, key2 string) (uint8,
 	if kvs.rateLimitReached() {
 		return 0, errors.New("rate limit reached")
 	}
-	key1 = SimHashPrefix + key1
-	key2 = SimHashPrefix + key2
+	key1 = util.SimHashPrefix + key1
+	key2 = util.SimHashPrefix + key2
 	shFingerprint1Bytes, err := kvs.get(key1)
 	if err != nil {
 		return 0, err
