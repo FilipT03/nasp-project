@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"nasp-project/model"
 	"nasp-project/structures/compression"
-	"nasp-project/structures/lsm/size_tiered_compaction"
 	"nasp-project/structures/sstable"
 	"nasp-project/util"
 	"os"
@@ -54,18 +53,4 @@ func Read(key []byte, compressionDict *compression.Dictionary, config *util.Conf
 		}
 	}
 	return nil, nil
-}
-
-// Compact compacts the LSM tree by merging SSTables from the same level.
-// Runs compaction only if the compaction start condition is met.
-// The compaction algorithm used is determined by the config.
-func Compact(compressionDict *compression.Dictionary, config *util.LSMTreeConfig, sstConfig *util.SSTableConfig) error {
-	if config.CompactionAlgorithm == "Size-Tiered" {
-		// TODO: Add condition for compaction call
-		size_tiered_compaction.Compact(compressionDict, sstConfig, config)
-	} else if config.CompactionAlgorithm == "Leveled" {
-		// TODO: Add condition for compaction call
-		// TODO: Implement
-	}
-	return nil
 }
