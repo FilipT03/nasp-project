@@ -528,13 +528,14 @@ func TestMergeMultipleSSTables(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	config := util.SSTableConfig{
+	config := &util.SSTableConfig{
 		SavePath:            tmpDir,
 		SingleFile:          false,
 		IndexDegree:         2,
 		SummaryDegree:       3,
 		FilterPrecision:     0.01,
 		MerkleTreeChunkSize: 16,
+		Compression:         false,
 	}
 
 	// Create some sample data records.
@@ -559,34 +560,34 @@ func TestMergeMultipleSSTables(t *testing.T) {
 	}
 
 	// Create four SSTables.
-	sstable1, err := CreateSSTable(recs1, config)
+	sstable1, err := CreateSSTable(recs1, nil, config)
 	if err != nil {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
 
-	sstable2, err := CreateSSTable(recs2, config)
+	sstable2, err := CreateSSTable(recs2, nil, config)
 	if err != nil {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
 
-	sstable3, err := CreateSSTable(recs3, config)
+	sstable3, err := CreateSSTable(recs3, nil, config)
 	if err != nil {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
 
-	sstable4, err := CreateSSTable(recs4, config)
+	sstable4, err := CreateSSTable(recs4, nil, config)
 	if err != nil {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
 
 	// Merge the SSTables.
-	merged, err := MergeMultipleSSTables([]*SSTable{sstable1, sstable2, sstable3, sstable4}, 2, &config)
+	merged, err := MergeMultipleSSTables([]*SSTable{sstable1, sstable2, sstable3, sstable4}, 2, config, nil)
 	if err != nil {
 		t.Errorf("Failed to merge SSTables: %v", err)
 	}
 
 	// Check that the merged SSTable is correct.
-	dr, err := merged.Read([]byte("key1"))
+	dr, err := merged.Read([]byte("key1"), nil)
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}
@@ -595,7 +596,7 @@ func TestMergeMultipleSSTables(t *testing.T) {
 		t.Errorf("Expected value of 'value1', got %v", dr.Value)
 	}
 
-	dr, err = merged.Read([]byte("key5"))
+	dr, err = merged.Read([]byte("key5"), nil)
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}
@@ -603,7 +604,7 @@ func TestMergeMultipleSSTables(t *testing.T) {
 		t.Errorf("Expected value of 'value5', got %v", dr.Value)
 	}
 
-	dr, err = merged.Read([]byte("key7"))
+	dr, err = merged.Read([]byte("key7"), nil)
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}
@@ -619,13 +620,14 @@ func TestSSTable_Rename(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	config := util.SSTableConfig{
+	config := &util.SSTableConfig{
 		SavePath:            tmpDir,
 		SingleFile:          false,
 		IndexDegree:         2,
 		SummaryDegree:       3,
 		FilterPrecision:     0.01,
 		MerkleTreeChunkSize: 16,
+		Compression:         false,
 	}
 
 	// Create some sample data records.
@@ -635,7 +637,7 @@ func TestSSTable_Rename(t *testing.T) {
 	}
 
 	// Create an SSTable.
-	sstable, err := CreateSSTable(recs1, config)
+	sstable, err := CreateSSTable(recs1, nil, config)
 	if err != nil {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
@@ -702,7 +704,7 @@ func TestSSTable_Rename(t *testing.T) {
 		t.Errorf("Expected metadata filenames to be equal.")
 	}
 
-	dr, err := sameTable.Read([]byte("key1"))
+	dr, err := sameTable.Read([]byte("key1"), nil)
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}
@@ -710,7 +712,7 @@ func TestSSTable_Rename(t *testing.T) {
 		t.Errorf("Expected value of 'value1', got %v", dr.Value)
 	}
 
-	dr, err = sameTable.Read([]byte("key2"))
+	dr, err = sameTable.Read([]byte("key2"), nil)
 	if err != nil {
 		t.Errorf("Failed to read record: %v", err)
 	}
@@ -733,6 +735,7 @@ func TestDataRecordGenerator(t *testing.T) {
 		SummaryDegree:       3,
 		FilterPrecision:     0.01,
 		MerkleTreeChunkSize: 16,
+		Compression:         false,
 	}
 
 	// Create some sample data records.
