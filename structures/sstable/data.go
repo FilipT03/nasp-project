@@ -337,6 +337,41 @@ func (db *DataBlock) GetRecordWithKeyFromOffset(key []byte, offset int64, compre
 	}
 }
 
+func (db *DataBlock) GetRecordAtKeyFromOffset(key []byte, offset int64, compressionDict *compression.Dictionary) (*DataRecord, int64, error) {
+	file, err := os.Open(db.Filename)
+	if err != nil {
+		return nil, -1, err
+	}
+	defer file.Close()
+
+	_, err = file.Seek(db.StartOffset+offset, 0)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	for {
+		dataRec, err := db.getNextRecord(file, compressionDict)
+		if err != nil {
+			return nil, -1, err
+		}
+		if dataRec == nil {
+			offset, err := file.Seek(0, 1)
+			if err != nil {
+				return dataRec, -1, err
+			}
+			return nil, offset, nil
+		}
+		cmp := bytesUtil.Compare(dataRec.Key, key)
+		if cmp >= 0 {
+			offset, err := file.Seek(0, 1)
+			if err != nil {
+				return dataRec, -1, err
+			}
+			return dataRec, offset, nil
+		}
+	}
+}
+
 // WriteMerged merges db1 and db2 and writes the result to db.
 // It also sets the size of the new data block.
 // Returns the number of records in the merged data block.
