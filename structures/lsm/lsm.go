@@ -82,7 +82,7 @@ func GetSSTablesForLevel(savePath string, level int) ([]*sstable.SSTable, error)
 		return nil, err
 	}
 
-	tables := make([]*sstable.SSTable, len(tocPaths)) // TODO: maby should be empty so we don't return nil pointers when a single open fails
+	var tables []*sstable.SSTable
 
 	for _, tocPath := range tocPaths {
 		table, err := sstable.OpenSSTableFromToc(tocPath)
@@ -90,7 +90,7 @@ func GetSSTablesForLevel(savePath string, level int) ([]*sstable.SSTable, error)
 			return tables, fmt.Errorf("failed to open SSTable from TOC file '%s' : %w", tocPath, err)
 		}
 
-		tables = append(tables, table) // just in case :)
+		tables = append(tables, table)
 	}
 
 	return tables, nil
@@ -134,8 +134,12 @@ func SortSSTablesByLabelNum(tables []*sstable.SSTable, reverse ...bool) {
 func GetLSMTreeNoexcept(savePath string, sortedByLabel ...bool) (levels [][]*sstable.SSTable) {
 	sort := len(sortedByLabel) != 0 && sortedByLabel[0]
 
-	levelNum := FirstLevelNum
-	for level, err := GetSSTablesForLevel(savePath, levelNum); err == nil; levelNum++ {
+	for levelNum := FirstLevelNum; ; levelNum++ {
+		level, err := GetSSTablesForLevel(savePath, levelNum)
+		if err != nil {
+			break
+		}
+
 		levels = append(levels, level)
 
 		if sort {
