@@ -193,7 +193,7 @@ func (db *DataBlock) writeRecord(file *os.File, rec *DataRecord, compressionDict
 }
 
 // writeRecordLen writes a record to the data block file and returns the number of bytes written.
-func (db *DataBlock) writeRecordLen(file *os.File, rec *DataRecord) (int, error) {
+func (db *DataBlock) writeRecordLen(file *os.File, rec *DataRecord, compressionDict *compression.Dictionary) (int, error) {
 	size := 0
 
 	bytes := make([]byte, 4)
@@ -204,13 +204,11 @@ func (db *DataBlock) writeRecordLen(file *os.File, rec *DataRecord) (int, error)
 	}
 	size += 4
 
-	bytes = make([]byte, 8)
-	binary.LittleEndian.PutUint64(bytes, rec.Timestamp)
-	_, err = file.Write(bytes)
+	n, err := util.WriteUvarintLen(file, rec.Timestamp)
 	if err != nil {
 		return size, err
 	}
-	size += 8
+	size += n
 
 	if rec.Tombstone {
 		_, err = file.Write([]byte{1})
@@ -225,36 +223,45 @@ func (db *DataBlock) writeRecordLen(file *os.File, rec *DataRecord) (int, error)
 	}
 	size += 1
 
-	bytes = make([]byte, 8)
-	binary.LittleEndian.PutUint64(bytes, uint64(len(rec.Key)))
-	_, err = file.Write(bytes)
-	if err != nil {
-		return size, err
-	}
-	size += 8
-
-	if !rec.Tombstone {
-		bytes = make([]byte, 8)
-		binary.LittleEndian.PutUint64(bytes, uint64(len(rec.Value)))
-		_, err = file.Write(bytes)
+	if compressionDict == nil {
+		// KeySize is left out if the compression is turned on
+		n, err = util.WriteUvarintLen(file, uint64(len(rec.Key)))
 		if err != nil {
 			return size, err
 		}
-		size += 8
+		size += n
 	}
-
-	_, err = file.Write(rec.Key)
-	if err != nil {
-		return size, err
-	}
-	size += len(rec.Key)
 
 	if !rec.Tombstone {
-		_, err = file.Write(rec.Value)
+		n, err = util.WriteUvarintLen(file, uint64(len(rec.Value)))
 		if err != nil {
 			return size, err
 		}
-		size += len(rec.Value)
+		size += n
+	}
+
+	if compressionDict == nil {
+		// compression if off, write the key bytes as-is
+		n, err = file.Write(rec.Key)
+		if err != nil {
+			return size, err
+		}
+		size += n
+	} else {
+		// compression is on, write only index from compression dictionary
+		n, err = util.WriteUvarintLen(file, uint64(compressionDict.GetIdx(rec.Key)))
+		if err != nil {
+			return size, err
+		}
+		size += n
+	}
+
+	if !rec.Tombstone {
+		n, err = file.Write(rec.Value)
+		if err != nil {
+			return size, err
+		}
+		size += n
 	}
 
 	return size, nil
@@ -267,74 +274,6 @@ func (db *DataBlock) isEndOfBlock(file *os.File) (bool, error) {
 		return false, err
 	}
 	return pos == db.StartOffset+db.Size, nil
-}
-
-// writeRecordLen writes a record to the data block file and returns the number of bytes written.
-func (db *DataBlock) writeRecordLen(file *os.File, rec *DataRecord) (int, error) {
-	size := 0
-
-	bytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(bytes, rec.CRC)
-	_, err := file.Write(bytes)
-	if err != nil {
-		return size, err
-	}
-	size += 4
-
-	bytes = make([]byte, 8)
-	binary.LittleEndian.PutUint64(bytes, rec.Timestamp)
-	_, err = file.Write(bytes)
-	if err != nil {
-		return size, err
-	}
-	size += 8
-
-	if rec.Tombstone {
-		_, err = file.Write([]byte{1})
-		if err != nil {
-			return size, err
-		}
-	} else {
-		_, err = file.Write([]byte{0})
-		if err != nil {
-			return size, err
-		}
-	}
-	size += 1
-
-	bytes = make([]byte, 8)
-	binary.LittleEndian.PutUint64(bytes, uint64(len(rec.Key)))
-	_, err = file.Write(bytes)
-	if err != nil {
-		return size, err
-	}
-	size += 8
-
-	if !rec.Tombstone {
-		bytes = make([]byte, 8)
-		binary.LittleEndian.PutUint64(bytes, uint64(len(rec.Value)))
-		_, err = file.Write(bytes)
-		if err != nil {
-			return size, err
-		}
-		size += 8
-	}
-
-	_, err = file.Write(rec.Key)
-	if err != nil {
-		return size, err
-	}
-	size += len(rec.Key)
-
-	if !rec.Tombstone {
-		_, err = file.Write(rec.Value)
-		if err != nil {
-			return size, err
-		}
-		size += len(rec.Value)
-	}
-
-	return size, nil
 }
 
 // getNextRecord assumes the provided file is at the start of the record and reads the next record.
