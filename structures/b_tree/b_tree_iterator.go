@@ -14,6 +14,9 @@ type BTreeIter struct {
 
 func (b *BTreeIter) Next() bool {
 	b.index += 1
+	for util.IsInvalidKey(b) {
+		b.index += 1
+	}
 	return b.index < b.maxIndex
 }
 
@@ -29,11 +32,16 @@ func (bt *BTree) NewIterator() (util.Iterator, error) {
 		return nil, errors.New("error: btree is empty")
 	}
 	records := getRecords(bt.root)
-	return &BTreeIter{
+
+	iter := &BTreeIter{
 		records:  records,
 		index:    0,
 		maxIndex: len(records),
-	}, nil
+	}
+	for util.IsInvalidKey(iter) {
+		iter.index += 1
+	}
+	return iter, nil
 }
 
 func getRecords(node *Node) (slice []*model.Record) {
