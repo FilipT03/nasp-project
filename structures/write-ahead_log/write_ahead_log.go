@@ -103,15 +103,12 @@ func NewWAL(walConfig util.WALConfig, instances int) (*WAL, error) {
 		if err != nil {
 			return nil, err
 		}
+		defer f.Close()
 		err = f.Truncate(HeaderSize)
 		if err != nil {
 			return nil, err
 		}
 		_, err = f.Write(binary.LittleEndian.AppendUint64(make([]byte, 0), HeaderSize))
-		if err != nil {
-			return nil, err
-		}
-		err = f.Close()
 		if err != nil {
 			return nil, err
 		}
@@ -284,28 +281,25 @@ func (wal *WAL) writeBuffer() error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	fStat, _ := f.Stat()
 	fSize := fStat.Size()
 	if uint64(fSize) == wal.segmentSize {
-		err = f.Close()
-		if err != nil {
-			return err
-		}
 		err = wal.incrementWALFileName()
 		if err != nil {
 			return err
 		}
-		f, err = os.OpenFile(wal.logsPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
+		f2, err := os.OpenFile(wal.logsPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
 		if err != nil {
 			return err
 		}
+		defer f2.Close()
 		fSize = HeaderSize
 	} else if fSize == 0 {
 		// we will look at empty files as if they contained the header, because no file can be smaller than
 		// the HeaderSize
 		fSize = HeaderSize
 	}
-	defer f.Close()
 
 	var nextHeader uint64 = 0
 	for _, element := range wal.buffer {
@@ -356,12 +350,12 @@ func (wal *WAL) writeBuffer() error {
 		}
 	}
 	// the latest file shouldn't be completely filled
-	f, err = os.OpenFile(wal.logsPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
+	f3, err := os.OpenFile(wal.logsPath+wal.latestFileName, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	fStat, _ = f.Stat()
+	defer f3.Close()
+	fStat, _ = f3.Stat()
 	fSize = fStat.Size()
 	if uint64(fSize) == wal.segmentSize {
 		err = wal.incrementWALFileName()
@@ -374,8 +368,6 @@ func (wal *WAL) writeBuffer() error {
 
 // writeSlice writes the byte array to the file of path. Returns error if data doesn't fit.
 func (wal *WAL) writeSlice(remainderSize uint64, slice []byte, path string) error {
-	var returnError error = nil
-
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return err
@@ -407,24 +399,16 @@ func (wal *WAL) writeSlice(remainderSize uint64, slice []byte, path string) erro
 	}
 
 	mmapFile, err := mmap.Map(f, mmap.RDWR, 0)
-	defer func(mmapFile *mmap.MMap) {
-		err := mmapFile.Unmap()
-		if err != nil {
-			returnError = err
-		}
-	}(&mmapFile) // Unmap will flush the map before unmapping
 	if err != nil {
 		return err
 	}
+	defer mmapFile.Unmap()
 
 	if fileSize == 0 {
 		binary.LittleEndian.PutUint64(mmapFile[0:HeaderSize], HeaderSize+remainderSize)
 		copy(mmapFile[HeaderSize:], slice)
 	} else {
 		copy(mmapFile[fileSize:], slice)
-	}
-	if returnError != nil {
-		return returnError
 	}
 	return nil
 }
@@ -538,7 +522,6 @@ func (wal *WAL) GetAllRecords() ([]*Record, []uint32, []uint64, error) {
 		}
 	}
 	return records, allFileIndexes, allByteOffsets, nil
-	//return memtableData, firstMemtable, returnError
 }
 
 // UpdateMemtableIndexing updates memtable indexing file with new values got from memtable.Memtable
