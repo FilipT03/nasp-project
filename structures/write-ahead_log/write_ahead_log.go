@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/edsrzf/mmap-go"
+	"nasp-project/model"
 	"nasp-project/util"
 	"os"
 	"strconv"
@@ -415,7 +416,7 @@ func (wal *WAL) writeSlice(remainderSize uint64, slice []byte, path string) erro
 
 // GetAllRecords reads records from WAL files and returns them with two additional slices, one for ending file index of
 // that record and other for the byte offset.
-func (wal *WAL) GetAllRecords() ([]*Record, []uint32, []uint64, error) {
+func (wal *WAL) GetAllRecords() ([]*model.Record, []uint32, []uint64, error) {
 	f, err := os.OpenFile(wal.memtableIndexingPath, os.O_RDWR, 0644)
 	if err != nil {
 		return nil, nil, nil, err
@@ -431,7 +432,7 @@ func (wal *WAL) GetAllRecords() ([]*Record, []uint32, []uint64, error) {
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	records := make([]*Record, 0)
+	records := make([]*model.Record, 0)
 	allFileIndexes := make([]uint32, 0)
 	allByteOffsets := make([]uint64, 0)
 	var remainderSlice []byte = nil
@@ -488,7 +489,7 @@ func (wal *WAL) GetAllRecords() ([]*Record, []uint32, []uint64, error) {
 				remainderSlice = append(remainderSlice, mmapFile[HeaderSize:]...)
 				break
 			} else {
-				records = append(records, record)
+				records = append(records, record.ToModelRecord())
 				allFileIndexes = append(allFileIndexes, uint32(currectFileIndex))
 				allByteOffsets = append(allByteOffsets, header)
 				remainderSlice = nil
@@ -505,7 +506,7 @@ func (wal *WAL) GetAllRecords() ([]*Record, []uint32, []uint64, error) {
 				copy(remainderSlice, mmapFile[offset:])
 				break
 			} else {
-				records = append(records, record)
+				records = append(records, record.ToModelRecord())
 				offset += KeyStart + record.KeySize + record.ValueSize
 				allFileIndexes = append(allFileIndexes, uint32(currectFileIndex))
 				allByteOffsets = append(allByteOffsets, offset)
@@ -624,4 +625,13 @@ func printRecord(record *Record) {
 		//fmt.Print(" ")
 	}
 	fmt.Println()
+}
+
+func (rec *Record) ToModelRecord() *model.Record {
+	return &model.Record{
+		Key:       []byte(rec.Key),
+		Value:     rec.Value,
+		Tombstone: rec.Tombstone,
+		Timestamp: rec.Timestamp,
+	}
 }
