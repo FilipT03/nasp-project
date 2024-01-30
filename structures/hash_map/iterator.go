@@ -7,7 +7,7 @@ import (
 	"sort"
 )
 
-type HashMapIter struct {
+type Iterator struct {
 	keys     []string
 	index    int
 	hashMap  *HashMap
@@ -24,7 +24,7 @@ func (hm *HashMap) NewIterator() (util.Iterator, error) {
 	}
 	sort.Strings(keys)
 
-	iter := &HashMapIter{
+	iter := &Iterator{
 		keys:     keys,
 		hashMap:  hm,
 		index:    0,
@@ -36,7 +36,7 @@ func (hm *HashMap) NewIterator() (util.Iterator, error) {
 	return iter, nil
 }
 
-func (h *HashMapIter) Next() bool {
+func (h *Iterator) Next() bool {
 	h.index += 1
 	for util.IsInvalidKey(h) {
 		h.index += 1
@@ -44,7 +44,7 @@ func (h *HashMapIter) Next() bool {
 	return h.index < h.maxIndex
 }
 
-func (h *HashMapIter) Value() *model.Record {
+func (h *Iterator) Value() *model.Record {
 	if h.index < h.maxIndex {
 		value, err := h.hashMap.Get([]byte(h.keys[h.index]))
 		if err != nil {

@@ -6,13 +6,13 @@ import (
 	"nasp-project/util"
 )
 
-type BTreeIter struct {
+type Iterator struct {
 	records  []*model.Record
 	index    int
 	maxIndex int
 }
 
-func (b *BTreeIter) Next() bool {
+func (b *Iterator) Next() bool {
 	b.index += 1
 	for util.IsInvalidKey(b) {
 		b.index += 1
@@ -20,7 +20,7 @@ func (b *BTreeIter) Next() bool {
 	return b.index < b.maxIndex
 }
 
-func (b *BTreeIter) Value() *model.Record {
+func (b *Iterator) Value() *model.Record {
 	if b.index < b.maxIndex {
 		return b.records[b.index]
 	}
@@ -33,7 +33,7 @@ func (bt *BTree) NewIterator() (util.Iterator, error) {
 	}
 	records := getRecords(bt.root)
 
-	iter := &BTreeIter{
+	iter := &Iterator{
 		records:  records,
 		index:    0,
 		maxIndex: len(records),

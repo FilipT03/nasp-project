@@ -6,7 +6,7 @@ import (
 	"nasp-project/util"
 )
 
-type SkipListIter struct {
+type Iterator struct {
 	current *skipListNode
 }
 
@@ -22,7 +22,7 @@ func (sl *SkipList) NewIterator() (util.Iterator, error) {
 		height--
 	}
 
-	iter := &SkipListIter{current: starterNode.next}
+	iter := &Iterator{current: starterNode.next}
 	for util.IsInvalidKey(iter) {
 		starterNode = starterNode.next
 		iter.current = starterNode
@@ -30,7 +30,7 @@ func (sl *SkipList) NewIterator() (util.Iterator, error) {
 	return iter, nil
 }
 
-func (iter *SkipListIter) Next() bool {
+func (iter *Iterator) Next() bool {
 	for iter.current.next != nil {
 		iter.current = iter.current.next
 		if !util.IsInvalidKey(iter) {
@@ -41,7 +41,7 @@ func (iter *SkipListIter) Next() bool {
 	return false
 }
 
-func (iter *SkipListIter) Value() *model.Record {
+func (iter *Iterator) Value() *model.Record {
 	if iter.current != nil {
 		return iter.current.record
 	}
