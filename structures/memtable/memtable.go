@@ -150,8 +150,8 @@ func (mts *Memtables) GetIterators() []util.Iterator {
 	return iterators
 }
 
-// GetRangeIterator returns a RangeIterator for every non-empty Memtable in the system.
-func (mts *Memtables) GetRangeIterator(startKey []byte, endKey []byte) []util.Iterator {
+// GetRangeIterators returns a RangeIterator for every non-empty Memtable in the system.
+func (mts *Memtables) GetRangeIterators(startKey []byte, endKey []byte) []util.Iterator {
 	iterators := make([]util.Iterator, 0)
 	for i := 0; i < mts.maxTables; i++ {
 		mt := mts.tables[i]
@@ -163,8 +163,8 @@ func (mts *Memtables) GetRangeIterator(startKey []byte, endKey []byte) []util.It
 	return iterators
 }
 
-// GetPrefixIterator returns a PrefixIterator for every non-empty Memtable in the system.
-func (mts *Memtables) GetPrefixIterator(prefix []byte) []util.Iterator {
+// GetPrefixIterators returns a PrefixIterator for every non-empty Memtable in the system.
+func (mts *Memtables) GetPrefixIterators(prefix []byte) []util.Iterator {
 	iterators := make([]util.Iterator, 0)
 	for i := 0; i < mts.maxTables; i++ {
 		mt := mts.tables[i]
