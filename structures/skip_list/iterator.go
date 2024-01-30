@@ -61,21 +61,18 @@ func (iter *Iterator) Value() *model.Record {
 }
 
 func (sl *SkipList) NewRangeIterator(startKey []byte, endKey []byte) (util.Iterator, error) {
-	starterNode, err := sl.getFirstNode()
+	iter, err := sl.NewIterator()
 	if err != nil {
 		return nil, err
 	}
-	for bytes.Compare(starterNode.record.Key, startKey) < 0 {
-		starterNode = starterNode.next
-		if starterNode == nil {
+	for bytes.Compare(iter.Value().Key, startKey) < 0 {
+		if !iter.Next() {
 			return nil, errors.New("error: could not find startKey")
 		}
 	}
 
 	return &RangeIterator{
-		Iterator: Iterator{
-			current: starterNode,
-		},
+		Iterator: *iter.(*Iterator),
 		startKey: startKey,
 		endKey:   endKey,
 	}, nil
@@ -97,22 +94,19 @@ func (iter *RangeIterator) Value() *model.Record {
 }
 
 func (sl *SkipList) NewPrefixIterator(prefix []byte) (util.Iterator, error) {
-	starterNode, err := sl.getFirstNode()
+	iter, err := sl.NewIterator()
 	if err != nil {
 		return nil, err
 	}
 
-	for !bytes.HasPrefix(starterNode.record.Key, prefix) {
-		starterNode = starterNode.next
-		if starterNode == nil {
+	for !bytes.HasPrefix(iter.Value().Key, prefix) {
+		if !iter.Next() {
 			return nil, errors.New("error: could not find prefix")
 		}
 	}
 	return &PrefixIterator{
-		Iterator: Iterator{
-			current: starterNode,
-		},
-		prefix: prefix,
+		Iterator: *iter.(*Iterator),
+		prefix:   prefix,
 	}, nil
 }
 
@@ -129,23 +123,4 @@ func (iter *PrefixIterator) Next() bool {
 
 func (iter *PrefixIterator) Value() *model.Record {
 	return iter.Iterator.Value()
-}
-
-func (sl *SkipList) getFirstNode() (*skipListNode, error) {
-	if sl.size == 0 {
-		return nil, errors.New("error: SkipList is empty")
-	}
-	starterNode := sl.head
-	height := sl.height
-
-	for height != 1 {
-		starterNode = starterNode.down
-		height--
-	}
-	starterNode = starterNode.next
-	for util.IsReservedKey(starterNode.record.Key) {
-		starterNode = starterNode.next
-	}
-
-	return starterNode, nil
 }
