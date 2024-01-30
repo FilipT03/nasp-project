@@ -560,3 +560,91 @@ func MergeSSTables(sst1, sst2 *SSTable, level int, config *util.SSTableConfig, c
 
 	return sstable, nil
 }
+
+// GetFirstRecord returns the record with the lexicographically smallest key in the SSTable,
+// as well as the offset in the file at the end of the returned record.
+func (sst *SSTable) GetFirstRecord(compressionDict *compression.Dictionary) (*model.Record, int64, error) {
+	file, err := os.Open(sst.Data.Filename)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	_, err = file.Seek(sst.Data.StartOffset, 0)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	dr, err := sst.Data.getNextRecord(file, compressionDict)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	offset, err := file.Seek(0, 1)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	if dr == nil {
+		return nil, offset, nil
+	}
+
+	return &model.Record{
+		Key:       dr.Key,
+		Value:     dr.Value,
+		Timestamp: dr.Timestamp,
+		Tombstone: dr.Tombstone,
+	}, offset, nil
+}
+
+// GetNextRecordAtKey returns the first record with key lexicographically greater or equal to key.
+func (sst *SSTable) GetNextRecordAtKey(key []byte, compressionDict *compression.Dictionary) (*model.Record, int64, error) {
+	if !sst.Summary.HasRangeLoaded() {
+		err := sst.Summary.LoadRange(compressionDict)
+		if err != nil {
+			return nil, -1, err
+		}
+		defer func() {
+			sst.Summary.StartKey = nil
+			sst.Summary.EndKey = nil
+		}()
+	}
+	if bytes.Compare(sst.Summary.EndKey, key) < 0 {
+		return nil, -1, nil
+	}
+	if bytes.Compare(sst.Summary.StartKey, key) >= 0 {
+		return sst.GetFirstRecord(compressionDict)
+	}
+
+	if !sst.Summary.HasLoaded() {
+		err := sst.Summary.Load(compressionDict)
+		if err != nil {
+			return nil, -1, err
+		}
+		defer func() {
+			sst.Summary.Records = nil
+		}()
+	}
+	sr, err := sst.Summary.GetIndexOffset(key, compressionDict)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	ir, err := sst.Index.GetRecordWithKeyFromOffset(key, sr.Offset, compressionDict)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	dr, offset, err := sst.Data.GetRecordAtKeyFromOffset(key, ir.Offset, compressionDict)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	if dr == nil {
+		return nil, sst.Data.StartOffset + sst.Data.Size, nil
+	}
+
+	return &model.Record{
+		Key:   dr.Key,
+		Value: dr.Value,
+	}, offset, nil
+}
