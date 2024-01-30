@@ -1,6 +1,7 @@
 package skip_list
 
 import (
+	"bytes"
 	"errors"
 	"nasp-project/model"
 	"nasp-project/util"
@@ -8,6 +9,17 @@ import (
 
 type Iterator struct {
 	current *skipListNode
+}
+
+type RangeIterator struct {
+	Iterator
+	startKey []byte
+	endKey   []byte
+}
+
+type PrefixIterator struct {
+	Iterator
+	prefix []byte
 }
 
 func (sl *SkipList) NewIterator() (util.Iterator, error) {
@@ -46,4 +58,94 @@ func (iter *Iterator) Value() *model.Record {
 		return iter.current.record
 	}
 	return nil
+}
+
+func (sl *SkipList) NewRangeIterator(startKey []byte, endKey []byte) (util.Iterator, error) {
+	starterNode, err := sl.getFirstNode()
+	if err != nil {
+		return nil, err
+	}
+	for bytes.Compare(starterNode.record.Key, startKey) < 0 {
+		starterNode = starterNode.next
+		if starterNode == nil {
+			return nil, errors.New("error: could not find startKey")
+		}
+	}
+
+	return &RangeIterator{
+		Iterator: Iterator{
+			current: starterNode,
+		},
+		startKey: startKey,
+		endKey:   endKey,
+	}, nil
+}
+
+func (iter *RangeIterator) Next() bool {
+	if !iter.Iterator.Next() {
+		return false
+	}
+	if bytes.Compare(iter.Value().Key, iter.endKey) > 0 {
+		iter.Iterator.current = nil
+		return false
+	}
+	return true
+}
+
+func (iter *RangeIterator) Value() *model.Record {
+	return iter.Iterator.Value()
+}
+
+func (sl *SkipList) NewPrefixIterator(prefix []byte) (util.Iterator, error) {
+	starterNode, err := sl.getFirstNode()
+	if err != nil {
+		return nil, err
+	}
+
+	for !bytes.HasPrefix(starterNode.record.Key, prefix) {
+		starterNode = starterNode.next
+		if starterNode == nil {
+			return nil, errors.New("error: could not find prefix")
+		}
+	}
+	return &PrefixIterator{
+		Iterator: Iterator{
+			current: starterNode,
+		},
+		prefix: prefix,
+	}, nil
+}
+
+func (iter *PrefixIterator) Next() bool {
+	if !iter.Iterator.Next() {
+		return false
+	}
+	for !bytes.HasPrefix(iter.Value().Key, iter.prefix) {
+		iter.Iterator.current = nil
+		return false
+	}
+	return true
+}
+
+func (iter *PrefixIterator) Value() *model.Record {
+	return iter.Iterator.Value()
+}
+
+func (sl *SkipList) getFirstNode() (*skipListNode, error) {
+	if sl.size == 0 {
+		return nil, errors.New("error: SkipList is empty")
+	}
+	starterNode := sl.head
+	height := sl.height
+
+	for height != 1 {
+		starterNode = starterNode.down
+		height--
+	}
+	starterNode = starterNode.next
+	for util.IsReservedKey(starterNode.record.Key) {
+		starterNode = starterNode.next
+	}
+
+	return starterNode, nil
 }

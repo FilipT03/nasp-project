@@ -59,3 +59,11 @@ func getRecords(node *Node) (slice []*model.Record) {
 	}
 	return
 }
+
+func (bt *BTree) NewRangeIterator(startKey []byte, endKey []byte) (util.Iterator, error) {
+	panic("implement me")
+}
+
+func (bt *BTree) NewPrefixIterator(prefix []byte) (util.Iterator, error) {
+	panic("implement me")
+}

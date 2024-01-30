@@ -54,3 +54,11 @@ func (h *Iterator) Value() *model.Record {
 	}
 	return nil
 }
+
+func (hm *HashMap) NewRangeIterator(startKey []byte, endKey []byte) (util.Iterator, error) {
+	panic("implement me")
+}
+
+func (hm *HashMap) NewPrefixIterator(prefix []byte) (util.Iterator, error) {
+	panic("implement me")
+}

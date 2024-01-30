@@ -19,6 +19,8 @@ type memtableStructure interface {
 	Clear()
 	IsFull() bool
 	NewIterator() (util.Iterator, error)
+	NewRangeIterator(startKey []byte, endKey []byte) (util.Iterator, error)
+	NewPrefixIterator(prefix []byte) (util.Iterator, error)
 }
 
 type Memtable struct {
@@ -147,6 +149,30 @@ func (mts *Memtables) GetIterators() []util.Iterator {
 	return iterators
 }
 
+func (mts *Memtables) GetRangeIterator(startKey []byte, endKey []byte) []util.Iterator {
+	iterators := make([]util.Iterator, 0)
+	for i := 0; i < mts.maxTables; i++ {
+		mt := mts.tables[i]
+
+		if iter, err := mt.structure.NewRangeIterator(startKey, endKey); err == nil {
+			iterators = append(iterators, iter)
+		}
+	}
+	return iterators
+}
+
+func (mts *Memtables) GetPrefixIterator(prefix []byte) []util.Iterator {
+	iterators := make([]util.Iterator, 0)
+	for i := 0; i < mts.maxTables; i++ {
+		mt := mts.tables[i]
+
+		if iter, err := mt.structure.NewPrefixIterator(prefix); err == nil {
+			iterators = append(iterators, iter)
+		}
+	}
+	return iterators
+}
+
 // isMinimalKey checks if the key obtained from the iterator is smaller than the current minimal key.
 func isMinimalKey(iter util.Iterator, minKey []byte, maxTimestamp uint64) bool {
 	return iter != nil && iter.Value() != nil && (bytes.Compare(iter.Value().Key, minKey) < 0 ||
@@ -154,22 +180,9 @@ func isMinimalKey(iter util.Iterator, minKey []byte, maxTimestamp uint64) bool {
 }
 
 // RangeScan returns records from memtables within the inclusive range [minValue, maxValue].
-func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Record {
-	iterators := mts.GetIterators()
+func (mts *Memtables) RangeScan(startValue []byte, endValue []byte) []*model.Record {
+	iterators := mts.GetRangeIterator(startValue, endValue)
 	records := make([]*model.Record, 0)
-
-	// Set all iterators to minValue (or first value greater than minValue)
-	for i := 0; i < len(iterators); i++ {
-		current := iterators[i]
-		if bytes.Compare(current.Value().Key, minValue) >= 0 {
-			continue
-		}
-		for current.Next() {
-			if bytes.Compare(current.Value().Key, minValue) >= 0 {
-				break
-			}
-		}
-	}
 
 	seenValues := make(map[string]bool)
 	for {
@@ -190,7 +203,7 @@ func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Recor
 		}
 
 		if !seenValues[string(minKey)] {
-			if bytes.Compare(iterators[minIndex].Value().Key, maxValue) > 0 {
+			if bytes.Compare(iterators[minIndex].Value().Key, endValue) > 0 {
 				iterators[minIndex] = nil
 				continue
 			}
@@ -198,9 +211,7 @@ func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Recor
 			seenValues[string(minKey)] = true
 		}
 
-		if !iterators[minIndex].Next() || bytes.Compare(iterators[minIndex].Value().Key, maxValue) > 0 {
-			iterators[minIndex] = nil
-		}
+		iterators[minIndex].Next()
 	}
 	return records
 }
@@ -211,20 +222,7 @@ func (mts *Memtables) PrefixScan(prefix []byte) []*model.Record {
 	if util.IsReservedKey(prefix) {
 		return records
 	}
-	iterators := mts.GetIterators()
-
-	// Set all iterators to first key with prefix.
-	for i := 0; i < len(iterators); i++ {
-		current := iterators[i]
-		if bytes.HasPrefix(current.Value().Key, prefix) {
-			continue
-		}
-		for current.Next() {
-			if bytes.HasPrefix(current.Value().Key, prefix) {
-				break
-			}
-		}
-	}
+	iterators := mts.GetPrefixIterator(prefix)
 
 	seenValues := make(map[string]bool)
 	for {
@@ -253,9 +251,7 @@ func (mts *Memtables) PrefixScan(prefix []byte) []*model.Record {
 			seenValues[string(minKey)] = true
 		}
 
-		if !iterators[minIndex].Next() {
-			iterators[minIndex] = nil
-		}
+		iterators[minIndex].Next()
 	}
 
 	return records
