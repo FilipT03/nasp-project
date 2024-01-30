@@ -1,6 +1,7 @@
 package write_ahead_log
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"nasp-project/util"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -78,7 +80,7 @@ type WAL struct {
 }
 
 // NewWAL is constructor for the Write ahead log.
-func NewWAL(walConfig util.WALConfig, instances int) (*WAL, error) {
+func NewWAL(walConfig *util.WALConfig, memtableInstances int) (*WAL, error) {
 	logsPath := walConfig.WALFolderPath + string(os.PathSeparator) + "logs" + string(os.PathSeparator)
 	memtableIndexingPath := walConfig.WALFolderPath + string(os.PathSeparator) + "memtable_indexing.bin"
 
@@ -93,18 +95,14 @@ func NewWAL(walConfig util.WALConfig, instances int) (*WAL, error) {
 	}
 	var latestFileName = ""
 	if len(dirEntries) == 0 {
-		latestFileName = "wal_"
-		missing := (NumberEnd - NumberStart) - 1
-		for missing > 0 {
-			latestFileName += "0"
-			missing -= 1
-		}
-		latestFileName += "1.log"
+		latestFileName = "wal_" + strings.Repeat("0", (NumberEnd-NumberStart)-1) + "1.log"
 		f, err := os.OpenFile(logsPath+latestFileName, os.O_RDWR|os.O_CREATE, 0644)
 		if err != nil {
 			return nil, err
 		}
-		defer f.Close()
+		defer func(f *os.File) {
+			_ = f.Close()
+		}(f)
 		err = f.Truncate(HeaderSize)
 		if err != nil {
 			return nil, err
@@ -125,7 +123,7 @@ func NewWAL(walConfig util.WALConfig, instances int) (*WAL, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = f.Truncate(int64((MemtableIndexingSize + 1) * instances))
+	err = f.Truncate(int64((MemtableIndexingSize + 1) * memtableInstances))
 	if err != nil {
 		return nil, err
 	}
@@ -142,26 +140,36 @@ func NewWAL(walConfig util.WALConfig, instances int) (*WAL, error) {
 }
 
 // PutCommit adds put commit to the WAL buffer.
-func (wal *WAL) PutCommit(key string, value []byte) {
+func (wal *WAL) PutCommit(key string, value []byte) error {
 	newRecord := createRecord(key, value, false)
-	wal.commitRecord(newRecord)
+	err := wal.commitRecord(newRecord)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // DeleteCommit adds delete commit to the WAL buffer.
-func (wal *WAL) DeleteCommit(key string, value []byte) {
+func (wal *WAL) DeleteCommit(key string, value []byte) error {
 	newRecord := createRecord(key, value, true)
-	wal.commitRecord(newRecord)
+	err := wal.commitRecord(newRecord)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // commitRecord adds record to the buffer, and calls writeBuffer if it's full.
-func (wal *WAL) commitRecord(record *Record) {
+func (wal *WAL) commitRecord(record *Record) error {
 	wal.buffer = append(wal.buffer, record)
 	if len(wal.buffer) >= wal.bufferSize {
 		err := wal.writeBuffer()
 		if err != nil {
-			wal.buffer = make([]*Record, 0)
+			return err
 		}
+		wal.buffer = make([]*Record, 0)
 	}
+	return nil
 }
 
 // FlushedMemtable is called by a memtable.Memtable after it was successfully flushed into the sstable.SSTable.
@@ -179,13 +187,13 @@ func (wal *WAL) FlushedMemtable(memtableIndex int) error {
 	if err != nil {
 		return err
 	}
-	bytes := make([]byte, MemtableIndexingSize)
-	_, err = f.Read(bytes)
+	byteS := make([]byte, MemtableIndexingSize)
+	_, err = f.Read(byteS)
 	if err != nil {
 		return err
 	}
-	fileIndex := binary.LittleEndian.Uint32(bytes[FileIndexStart : FileIndexStart+FileIndexSize])
-	byteOffset := binary.LittleEndian.Uint64(bytes[ByteOffsetStart : ByteOffsetStart+ByteOffsetSize])
+	fileIndex := binary.LittleEndian.Uint32(byteS[FileIndexStart : FileIndexStart+FileIndexSize])
+	byteOffset := binary.LittleEndian.Uint64(byteS[ByteOffsetStart : ByteOffsetStart+ByteOffsetSize])
 
 	// Deleting the unneeded logs
 	dirEntries, err := os.ReadDir(wal.logsPath)
@@ -219,7 +227,7 @@ func (wal *WAL) FlushedMemtable(memtableIndex int) error {
 		return err
 	}
 	latestFileSize := latestFileStat.Size()
-	bytes = make([]byte, 0)
+	byteS = make([]byte, 0)
 	newFileIndex, err := strconv.Atoi(wal.latestFileName[NumberStart:NumberEnd])
 	var newByteOffset uint64
 	if latestFileSize <= HeaderSize {
@@ -231,14 +239,14 @@ func (wal *WAL) FlushedMemtable(memtableIndex int) error {
 	if err != nil {
 		return err
 	}
-	bytes = binary.LittleEndian.AppendUint32(bytes, uint32(newFileIndex))
-	bytes = binary.LittleEndian.AppendUint64(bytes, newByteOffset)
+	byteS = binary.LittleEndian.AppendUint32(byteS, uint32(newFileIndex))
+	byteS = binary.LittleEndian.AppendUint64(byteS, newByteOffset)
 
 	_, err = f.Seek(-int64(MemtableIndexingSize), 1)
 	if err != nil {
 		return err
 	}
-	_, err = f.Write(bytes)
+	_, err = f.Write(byteS)
 	if err != nil {
 		return err
 	}
@@ -247,10 +255,10 @@ func (wal *WAL) FlushedMemtable(memtableIndex int) error {
 	if err != nil {
 		return err
 	}
-	bytes = make([]byte, 0)
-	bytes = binary.LittleEndian.AppendUint32(bytes, uint32(fileIndex))
-	bytes = binary.LittleEndian.AppendUint64(bytes, byteOffset)
-	_, err = f.Write(bytes)
+	byteS = make([]byte, 0)
+	byteS = binary.LittleEndian.AppendUint32(byteS, fileIndex)
+	byteS = binary.LittleEndian.AppendUint64(byteS, byteOffset)
+	_, err = f.Write(byteS)
 	if err != nil {
 		return err
 	}
@@ -266,10 +274,7 @@ func (wal *WAL) incrementWALFileName() error {
 	}
 	stringNumber := strconv.Itoa(number + 1)
 	missing := (NumberEnd - NumberStart) - len(stringNumber)
-	for missing > 0 {
-		stringNumber = "0" + stringNumber
-		missing -= 1
-	}
+	stringNumber = strings.Repeat("0", missing) + stringNumber
 	wal.latestFileName = wal.latestFileName[:NumberStart] + stringNumber + wal.latestFileName[NumberEnd:]
 	return nil
 }
@@ -282,7 +287,9 @@ func (wal *WAL) writeBuffer() error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(f)
 	fStat, _ := f.Stat()
 	fSize := fStat.Size()
 	if uint64(fSize) == wal.segmentSize {
@@ -294,7 +301,9 @@ func (wal *WAL) writeBuffer() error {
 		if err != nil {
 			return err
 		}
-		defer f2.Close()
+		defer func(f2 *os.File) {
+			_ = f2.Close()
+		}(f2)
 		fSize = HeaderSize
 	} else if fSize == 0 {
 		// we will look at empty files as if they contained the header, because no file can be smaller than
@@ -355,7 +364,9 @@ func (wal *WAL) writeBuffer() error {
 	if err != nil {
 		return err
 	}
-	defer f3.Close()
+	defer func(f3 *os.File) {
+		_ = f3.Close()
+	}(f3)
 	fStat, _ = f3.Stat()
 	fSize = fStat.Size()
 	if uint64(fSize) == wal.segmentSize {
@@ -373,7 +384,9 @@ func (wal *WAL) writeSlice(remainderSize uint64, slice []byte, path string) erro
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(f)
 
 	fi, err := f.Stat()
 	if err != nil {
@@ -403,7 +416,9 @@ func (wal *WAL) writeSlice(remainderSize uint64, slice []byte, path string) erro
 	if err != nil {
 		return err
 	}
-	defer mmapFile.Unmap()
+	defer func(mmapFile *mmap.MMap) {
+		_ = mmapFile.Unmap()
+	}(&mmapFile)
 
 	if fileSize == 0 {
 		binary.LittleEndian.PutUint64(mmapFile[0:HeaderSize], HeaderSize+remainderSize)
@@ -423,10 +438,10 @@ func (wal *WAL) GetAllRecords() ([]*model.Record, []uint32, []uint64, error) {
 	}
 	fi, _ := f.Stat()
 	fSize := fi.Size()
-	bytes := make([]byte, fSize)
-	_, _ = f.Read(bytes)
-	startFileIndex := binary.LittleEndian.Uint32(bytes[0:FileIndexSize])
-	startByteOffset := binary.LittleEndian.Uint64(bytes[FileIndexSize:MemtableIndexingSize])
+	byteS := make([]byte, fSize)
+	_, _ = f.Read(byteS)
+	startFileIndex := binary.LittleEndian.Uint32(byteS[0:FileIndexSize])
+	startByteOffset := binary.LittleEndian.Uint64(byteS[FileIndexSize:MemtableIndexingSize])
 
 	dirEntries, err := os.ReadDir(wal.logsPath)
 	if err != nil {
@@ -452,7 +467,7 @@ func (wal *WAL) GetAllRecords() ([]*model.Record, []uint32, []uint64, error) {
 			toSkip--
 			continue
 		}
-		currectFileIndex, err := strconv.Atoi(entry.Name()[NumberStart:NumberEnd])
+		currentFileIndex, err := strconv.Atoi(entry.Name()[NumberStart:NumberEnd])
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -465,7 +480,7 @@ func (wal *WAL) GetAllRecords() ([]*model.Record, []uint32, []uint64, error) {
 		fi, _ := f.Stat()
 		fSize := fi.Size()
 		if fSize <= HeaderSize {
-			f.Close()
+			_ = f.Close()
 			continue
 		}
 
@@ -490,7 +505,7 @@ func (wal *WAL) GetAllRecords() ([]*model.Record, []uint32, []uint64, error) {
 				break
 			} else {
 				records = append(records, record.ToModelRecord())
-				allFileIndexes = append(allFileIndexes, uint32(currectFileIndex))
+				allFileIndexes = append(allFileIndexes, uint32(currentFileIndex))
 				allByteOffsets = append(allByteOffsets, header)
 				remainderSlice = nil
 			}
@@ -508,7 +523,7 @@ func (wal *WAL) GetAllRecords() ([]*model.Record, []uint32, []uint64, error) {
 			} else {
 				records = append(records, record.ToModelRecord())
 				offset += KeyStart + record.KeySize + record.ValueSize
-				allFileIndexes = append(allFileIndexes, uint32(currectFileIndex))
+				allFileIndexes = append(allFileIndexes, uint32(currentFileIndex))
 				allByteOffsets = append(allByteOffsets, offset)
 			}
 		}
@@ -536,10 +551,10 @@ func (wal *WAL) UpdateMemtableIndexing(fileIndexes []uint32, byteOffsets []uint6
 		return err
 	}
 
-	bytes := make([]byte, 0)
+	byteS := make([]byte, 0)
 	for i := 0; i < len(fileIndexes); i++ {
-		bytes = binary.LittleEndian.AppendUint32(bytes, fileIndexes[i])
-		bytes = binary.LittleEndian.AppendUint64(bytes, byteOffsets[i])
+		byteS = binary.LittleEndian.AppendUint32(byteS, fileIndexes[i])
+		byteS = binary.LittleEndian.AppendUint64(byteS, byteOffsets[i])
 	}
 	return nil
 }
@@ -634,4 +649,30 @@ func (rec *Record) ToModelRecord() *model.Record {
 		Tombstone: rec.Tombstone,
 		Timestamp: rec.Timestamp,
 	}
+}
+
+func (rec *Record) Equals(other *Record, ignoreTimestamp bool) bool {
+	return rec.CRC == other.CRC &&
+		rec.Tombstone == other.Tombstone &&
+		(rec.Timestamp == other.Timestamp || ignoreTimestamp) &&
+		rec.KeySize == other.KeySize &&
+		rec.Key == other.Key &&
+		rec.ValueSize == other.ValueSize &&
+		bytes.Equal(rec.Value, other.Value)
+}
+
+func (rec *Record) ToString() string {
+	if rec == nil {
+		return "nil"
+	}
+	elems := []string{
+		fmt.Sprintf("CRC: %d", rec.CRC),
+		fmt.Sprintf("Timestamp: %d", rec.Timestamp),
+		fmt.Sprintf("Tombstone: %t", rec.Tombstone),
+		fmt.Sprintf("KeySize: %d", rec.KeySize),
+		fmt.Sprintf("ValueSize: %d", rec.ValueSize),
+		fmt.Sprintf("Key: %s", rec.Key),
+		fmt.Sprintf("Value: %s", string(rec.Value)),
+	}
+	return strings.Join(elems, "\n")
 }
