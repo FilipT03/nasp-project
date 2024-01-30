@@ -93,7 +93,7 @@ func (ib *IndexBlock) CreateFromDataBlock(sparseDeg int, db *DataBlock, compress
 
 		var keySize uint64 // only if compression is turned off
 		if compressionDict == nil {
-			keySize, err = util.ReadUvarint(dbFile)
+			keySize, n, err = util.ReadUvarintLen(dbFile)
 			if err != nil {
 				return err
 			}
