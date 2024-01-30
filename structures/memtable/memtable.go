@@ -58,7 +58,7 @@ func CreateMemtables(config *util.MemtableConfig) *Memtables {
 				structure: skip_list.NewSkipList(uint32(config.MaxSize), uint32(config.SkipList.MaxHeight)),
 			})
 		}
-	case "hashMap":
+	case "HashMap":
 		for i := 0; i < instances; i++ {
 			memts.tables = append(memts.tables, &Memtable{
 				structure: hash_map.NewHashMap(uint32(config.MaxSize)),

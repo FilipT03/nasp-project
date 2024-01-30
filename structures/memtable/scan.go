@@ -8,7 +8,7 @@ import (
 
 // RangeScan returns records from memtables within the inclusive range [minValue, maxValue].
 func (mts *Memtables) RangeScan(startValue []byte, endValue []byte) []*model.Record {
-	iterators := mts.GetRangeIterator(startValue, endValue)
+	iterators := mts.GetRangeIterators(startValue, endValue)
 	records := make([]*model.Record, 0)
 
 	seenValues := make(map[string]bool)
@@ -49,7 +49,7 @@ func (mts *Memtables) PrefixScan(prefix []byte) []*model.Record {
 	if util.IsReservedKey(prefix) {
 		return records
 	}
-	iterators := mts.GetPrefixIterator(prefix)
+	iterators := mts.GetPrefixIterators(prefix)
 
 	seenValues := make(map[string]bool)
 	for {
