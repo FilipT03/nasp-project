@@ -2,7 +2,6 @@ package sstable
 
 import (
 	"bytes"
-	bytesUtil "bytes"
 	"errors"
 	"fmt"
 	"nasp-project/structures/compression"
@@ -89,7 +88,7 @@ func MergeMultipleSSTables(tables []*SSTable, level int, config *util.SSTableCon
 
 // chose which record should be written to the SSTable
 func chooseRecord(a, b *DataRecord) *DataRecord {
-	cmp := bytesUtil.Compare(a.Key, b.Key)
+	cmp := bytes.Compare(a.Key, b.Key)
 	switch cmp {
 	case -1:
 		{
