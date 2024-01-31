@@ -28,6 +28,10 @@ func Start(db *KeyValueStore) {
 			continue
 		}
 		if exit {
+			err = db.wal.EmptyBuffer()
+			if err != nil {
+				fmt.Println("Error: " + err.Error())
+			}
 			break
 		}
 	}
