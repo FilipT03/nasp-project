@@ -127,6 +127,11 @@ func NewWAL(walConfig *util.WALConfig, memtableInstances int) (*WAL, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, _ = f.Seek(0, 0)
+	byteS := make([]byte, 0)
+	byteS = binary.LittleEndian.AppendUint32(byteS, 1)
+	byteS = binary.LittleEndian.AppendUint64(byteS, HeaderSize)
+	_, _ = f.Write(byteS)
 
 	return &WAL{
 		buffer:               make([]*Record, 0),
@@ -456,9 +461,15 @@ func (wal *WAL) GetAllRecords() ([]*model.Record, []uint32, []uint64, error) {
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	toSkip := startFileIndex - uint32(oldestFileIndex)
-	if toSkip < 0 {
-		return nil, nil, nil, errors.New("error: memtable indexing file referencing non existent files")
+
+	var toSkip uint32
+	if startFileIndex == 0 {
+		toSkip = 0
+	} else {
+		toSkip = startFileIndex - uint32(oldestFileIndex)
+		if toSkip < 0 {
+			return nil, nil, nil, errors.New("error: memtable indexing file referencing non existent files")
+		}
 	}
 
 	first := true
@@ -492,7 +503,9 @@ func (wal *WAL) GetAllRecords() ([]*model.Record, []uint32, []uint64, error) {
 		header := binary.LittleEndian.Uint64(mmapFile[0:HeaderSize])
 		if first {
 			first = false
-			header = startByteOffset
+			if startByteOffset > HeaderSize {
+				header = startByteOffset
+			}
 		}
 		//fmt.Println("header: ", header)
 		if remainderSlice != nil { // we need to combine the end of the last file and start of this one
@@ -502,7 +515,7 @@ func (wal *WAL) GetAllRecords() ([]*model.Record, []uint32, []uint64, error) {
 			}
 			if record == nil { // the record is in more than two files
 				remainderSlice = append(remainderSlice, mmapFile[HeaderSize:]...)
-				break
+				continue
 			} else {
 				records = append(records, record.ToModelRecord())
 				allFileIndexes = append(allFileIndexes, uint32(currentFileIndex))
