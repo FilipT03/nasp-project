@@ -177,6 +177,16 @@ func (wal *WAL) commitRecord(record *Record) error {
 	return nil
 }
 
+// EmptyBuffer writes everything in the buffer and clears it.
+func (wal *WAL) EmptyBuffer() error {
+	err := wal.writeBuffer()
+	if err != nil {
+		return err
+	}
+	wal.buffer = make([]*Record, 0)
+	return nil
+}
+
 // FlushedMemtable is called by a memtable.Memtable after it was successfully flushed into the sstable.SSTable.
 // Deletes old logs that were written in the SSTable during the flushing.
 func (wal *WAL) FlushedMemtable(memtableIndex int) error {
