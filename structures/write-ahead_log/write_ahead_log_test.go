@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// TestNewWAL tests the WAL constructor.
 func TestNewWAL(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "wal_test_")
 	if err != nil {
@@ -50,6 +51,7 @@ func TestNewWAL(t *testing.T) {
 	}
 }
 
+// TestWAL_PutCommit tests the WAL.PutCommit function.
 func TestWAL_PutCommit(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "wal_test_")
 	if err != nil {
@@ -99,6 +101,7 @@ func TestWAL_PutCommit(t *testing.T) {
 	}
 }
 
+// TestWAL_DeleteCommit tests the WAL.DeleteCommit function.
 func TestWAL_DeleteCommit(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "wal_test_")
 	if err != nil {
@@ -144,6 +147,7 @@ func TestWAL_DeleteCommit(t *testing.T) {
 	}
 }
 
+// TestWAL_writeBufferBasic tests writing small logs in WAL.
 func TestWAL_writeBufferBasic(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "wal_test_")
 	if err != nil {
@@ -213,6 +217,7 @@ func TestWAL_writeBufferBasic(t *testing.T) {
 	}
 }
 
+// TestWALReadWrite tests writing records and then reading them.
 func TestWALReadWrite(t *testing.T) {
 
 	tmpDir, err := os.MkdirTemp("", "wal_test_")
@@ -273,6 +278,7 @@ func TestWALReadWrite(t *testing.T) {
 	}
 }
 
+// TestWAL_writeBufferExactSegments tests writing logs of exact size as the segments in WAL.
 func TestWAL_writeBufferExactSegments(t *testing.T) {
 
 	tmpDir, err := os.MkdirTemp("", "wal_test_")
@@ -340,6 +346,7 @@ func TestWAL_writeBufferExactSegments(t *testing.T) {
 	}
 }
 
+// TestWAL_writeBufferLargerRecords tests writing logs larger than the segment in WAL.
 func TestWAL_writeBufferLargerRecords(t *testing.T) {
 
 	tmpDir, err := os.MkdirTemp("", "wal_test_")
