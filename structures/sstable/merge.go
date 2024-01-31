@@ -129,12 +129,15 @@ func (gen *DataRecordGenerator) Merge(other *DataRecordGenerator, consumer DataR
 		}
 	}()
 
-	err = mergeGenerators(gen, other, consumer.Accept, skipDeleted...)
-	return
+	return mergeGenerators(gen, other, consumer.Accept, skipDeleted...)
 }
 
 // TODO: should be double checked
-// ...
+
+// Preforms merging operation between the two given generators which must yield records with strictly increasing key values.
+// It selects records in a way that corresponds to iterating through the result of merge operation on tables represented by the
+// given generators and yields them to the consumer. The whole process is aborted if the consumer returns an error.
+// If skipDeleted a record that is deleted, if it is relevant for the given key, will be skipped. By default no records are skipped.
 func mergeGenerators(gen1, gen2 *DataRecordGenerator, consumer func(*DataRecord) error, skipDeleted ...bool) (err error) {
 
 	getNextRecord := func(generator *DataRecordGenerator, record **DataRecord) {
@@ -218,36 +221,55 @@ func mergeGenerators(gen1, gen2 *DataRecordGenerator, consumer func(*DataRecord)
 	return nil
 }
 
-// ...
+type SSTableWithStats struct {
+	Table          *SSTable
+	RecordsWritten uint
+	BytesWritten   int64
+}
+
+// ... merges generators writing the result into tables on level levelNum switching to a new table when data block limit is reached ...
 func mergeGeneratorsWithLimit(
 	gen1, gen2 *DataRecordGenerator,
 	levelNum int,
 	compressionDict *compression.Dictionary,
 	sstableConfig *util.SSTableConfig,
 	lsmConfig *util.LSMTreeConfig,
-) ([]*SSTable, error) {
+	skipDeleted ...bool,
+) ([]*SSTableWithStats, error) { // maby shouldn't use pointers
 
-	var tables []*SSTable
-	var currentDataBlock *DataBlock
+	var tables []*SSTableWithStats
+	var currentTable *SSTable
 	var currentFile *os.File
+
+	var currentWrittenBytes int64
+	var currentWrittenRecords uint
+
 	// switch to new SSTable, its data block and open its data block file
 	newTable := func() error {
-		table, err := initializeSSTable(levelNum, sstableConfig)
+		nextTable, err := initializeSSTable(levelNum, sstableConfig)
 		if err != nil {
 			return fmt.Errorf("failed to switch to a new SSTable, couldn't initialize a new table at level %d : %w", levelNum, err)
 		}
+		// every time except the first time
+		if currentTable != nil {
+			tables = append(tables, &SSTableWithStats{
+				Table:          currentTable,
+				RecordsWritten: currentWrittenRecords,
+				BytesWritten:   currentWrittenBytes,
+			})
+		}
 
-		tables = append(tables, table)
-		currentDataBlock = &table.Data
+		currentTable = nextTable
+		currentWrittenRecords = 0
+		currentWrittenBytes = 0
 
 		if currentFile != nil {
 			currentFile.Close() // should this err be checked?
 		}
 
-		if currentFile, err = os.OpenFile(table.Data.Filename, os.O_WRONLY, 0644); err != nil {
-			return fmt.Errorf("failed to switch to a new SSTable, couldn't open the data block file '%s' : %w", table.Data.Filename, err)
+		if currentFile, err = os.OpenFile(nextTable.Data.Filename, os.O_WRONLY, 0644); err != nil {
+			return fmt.Errorf("failed to switch to a new SSTable, couldn't open the data block file '%s' : %w", nextTable.Data.Filename, err)
 		}
-
 		// see if should seek begining of db
 		return nil
 	}
@@ -257,29 +279,26 @@ func mergeGeneratorsWithLimit(
 		return nil, err
 	}
 
-	var currentWritten int64 = 0
 	// write to current datablock and switch tables if limit is reached
 	writer := func(record *DataRecord) error {
-		numBytes, err := currentDataBlock.writeRecordLen(currentFile, record, compressionDict)
+		numBytes, err := currentTable.Data.writeRecordLen(currentFile, record, compressionDict)
 		if err != nil {
-			return fmt.Errorf("failed to write record : %w", err)
+			return fmt.Errorf("failed to write record : %w", err) // maby add file name
 		}
 
-		currentWritten += int64(numBytes)
-		if currentWritten > lsmConfig.Leveled.DataBlockSize {
+		currentWrittenRecords++
+		currentWrittenBytes += int64(numBytes)
+
+		if currentWrittenBytes > lsmConfig.Leveled.DataBlockSize {
 			if err := newTable(); err != nil {
 				return err
 			}
-
-			currentWritten = 0
 		}
 
 		return nil
 	}
 
-	maxLevelNum := lsmConfig.MaxLevel - 1 + util.LSMFirstLevelNum
-	// skip deleted only if we are merging into the last level and the penultimate level is a run (big sstable partitioned into multiple smaller ones)
-	err := mergeGenerators(gen1, gen2, writer, (lsmConfig.MaxLevel > 2 && levelNum == maxLevelNum))
+	err := mergeGenerators(gen1, gen2, writer, skipDeleted...)
 	return tables, err
 }
 
@@ -291,6 +310,69 @@ func MergeTableWithRun(
 	levelNum int,
 	table *SSTable,
 	run ...*SSTable,
-) (err error) {
-	return fmt.Errorf("not implemented yet :(")
+) (newTables []*SSTable, err error) {
+	// used for merging
+	var tableGen, runGen *DataRecordGenerator
+
+	if tableGen, err = NewDataRecordGenerator([]*DataBlock{&table.Data}, compressionDict); err != nil {
+		return
+	}
+
+	runBlocks := make([]*DataBlock, len(run))
+	for _, table := range run {
+		runBlocks = append(runBlocks, &table.Data) // just in case
+	}
+
+	if runGen, err = NewDataRecordGenerator(runBlocks, compressionDict); err != nil {
+		return
+	}
+
+	// cleanup after we are done
+	defer func() {
+		// deleting files for the old SSTables from disc only if merge was sucessful // TODO: ???
+		if err == nil {
+			for _, table := range append(run, table) {
+				if cerr := table.deleteFiles(); cerr != nil {
+					err = fmt.Errorf("%w && failed to delete files for SSTable '%s' from disc : %w", err, table.TOCFilename, cerr)
+				}
+				// we delete all tables even if one deletion fails
+			}
+		} else {
+			err = fmt.Errorf("deletion of old table files was aborted : %w", err)
+		}
+
+		// clear generators
+		for _, gen := range [...]*DataRecordGenerator{tableGen, runGen} {
+			if cerr := gen.Clear(); cerr != nil {
+				err = fmt.Errorf("%w && failed to clear %v : %w", err, gen, cerr)
+			}
+			// we clear all generators even if one clearance fails
+		}
+	}()
+
+	maxLevelNum := lsmConfig.MaxLevel - 1 + util.LSMFirstLevelNum
+	// skip deleted only if we are merging into the last level and the penultimate level is a run (big sstable partitioned into multiple smaller ones)
+	skipDeleted := lsmConfig.MaxLevel > 2 && levelNum == maxLevelNum
+
+	var tablesWithStats []*SSTableWithStats
+	tablesWithStats, err = mergeGeneratorsWithLimit(tableGen, runGen, levelNum, compressionDict, sstableConfig, lsmConfig, skipDeleted)
+
+	if err != nil {
+		return
+	}
+
+	// successfully merged, now we create other elements for SSTables from created data blocks
+	for _, tableStats := range tablesWithStats {
+		if berr := tableStats.Table.BuildFromDataBlock(tableStats.RecordsWritten, compressionDict, sstableConfig); berr != nil { // TODO: we need to count the records :(
+			// idk if we should continue or not ?
+			err = fmt.Errorf("%w && failed to build from data block %v : %w", err, tableStats.Table, berr)
+			return
+		}
+
+		newTables = append(newTables, tableStats.Table)
+	}
+
+	return
 }
+
+// NOTE: after this we need to adjust the labels of generated tables
