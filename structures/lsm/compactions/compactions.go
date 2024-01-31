@@ -6,7 +6,7 @@ import (
 	"nasp-project/util"
 )
 
-// Compact compacts the LSM tree by merging SSTables from the same level.
+// Compact compacts the LSM tree by merging SSTables.
 // Runs compaction only if the compaction start condition is met.
 // The compaction algorithm used is determined by the config.
 func Compact(compressionDict *compression.Dictionary, config *util.LSMTreeConfig, sstConfig *util.SSTableConfig) error {

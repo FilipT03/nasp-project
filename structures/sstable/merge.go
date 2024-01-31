@@ -118,14 +118,19 @@ type DataRecordConsumer interface {
 }
 
 // Interesting idea to make a method for merging generators?
-func (gen *DataRecordGenerator) Merge(other *DataRecordGenerator, consumer DataRecordConsumer, skipDeleted ...bool) error {
-	// TODO: maby should clear the generators afterwards
+func (gen *DataRecordGenerator) Merge(other *DataRecordGenerator, consumer DataRecordConsumer, skipDeleted ...bool) (err error) {
 	defer func() {
-		other.Clear()
-		gen.Clear()
+		if cerr := gen.Clear(); cerr != nil {
+			err = fmt.Errorf("%w && failed to clear this generator : %w", err, cerr)
+		}
+
+		if cerr := other.Clear(); cerr != nil {
+			err = fmt.Errorf("%w && failed to clear other generator : %w", err, cerr)
+		}
 	}()
 
-	return mergeGenerators(gen, other, consumer.Accept, skipDeleted...)
+	err = mergeGenerators(gen, other, consumer.Accept, skipDeleted...)
+	return
 }
 
 // TODO: should be double checked
@@ -147,9 +152,9 @@ func mergeGenerators(gen1, gen2 *DataRecordGenerator, consumer func(*DataRecord)
 		}
 	}
 
-	// getting initial records to start iteration
+	// points to the current record from the corresponding generator
 	var rec1, rec2 *DataRecord
-
+	// getting initial records to start the iteration
 	if getNextRecord(gen1, &rec1); err != nil {
 		return err
 	}
@@ -213,8 +218,6 @@ func mergeGenerators(gen1, gen2 *DataRecordGenerator, consumer func(*DataRecord)
 	return nil
 }
 
-const lsmFirstLevel int = 1
-
 // ...
 func mergeGeneratorsWithLimit(
 	gen1, gen2 *DataRecordGenerator,
@@ -224,44 +227,42 @@ func mergeGeneratorsWithLimit(
 	lsmConfig *util.LSMTreeConfig,
 ) ([]*SSTable, error) {
 
-	var (
-		tables []*SSTable
-
-		currentDataBlock *DataBlock
-		currentFile      *os.File
-
-		currentWritten int64 = 0
-	)
-
+	var tables []*SSTable
+	var currentDataBlock *DataBlock
+	var currentFile *os.File
+	// switch to new SSTable, its data block and open its data block file
 	newTable := func() error {
 		table, err := initializeSSTable(levelNum, sstableConfig)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to switch to a new SSTable, couldn't initialize a new table at level %d : %w", levelNum, err)
 		}
 
 		tables = append(tables, table)
 		currentDataBlock = &table.Data
 
 		if currentFile != nil {
-			currentFile.Close()
+			currentFile.Close() // should this err be checked?
 		}
 
-		currentFile, err = os.OpenFile(table.Data.Filename, os.O_WRONLY, 0644)
-		if err != nil {
-			return err
+		if currentFile, err = os.OpenFile(table.Data.Filename, os.O_WRONLY, 0644); err != nil {
+			return fmt.Errorf("failed to switch to a new SSTable, couldn't open the data block file '%s' : %w", table.Data.Filename, err)
 		}
 
+		// see if should seek begining of db
 		return nil
 	}
 
+	// adding initial table to the tables
 	if err := newTable(); err != nil {
 		return nil, err
 	}
 
+	var currentWritten int64 = 0
+	// write to current datablock and switch tables if limit is reached
 	writer := func(record *DataRecord) error {
 		numBytes, err := currentDataBlock.writeRecordLen(currentFile, record, compressionDict)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to write record : %w", err)
 		}
 
 		currentWritten += int64(numBytes)
@@ -276,15 +277,20 @@ func mergeGeneratorsWithLimit(
 		return nil
 	}
 
-	err := mergeGenerators(gen1, gen2, writer, levelNum == lsmConfig.MaxLevel-lsmFirstLevel)
-	if err != nil {
-		return nil, err
-	}
-
-	return tables, nil
+	maxLevelNum := lsmConfig.MaxLevel - 1 + util.LSMFirstLevelNum
+	// skip deleted only if we are merging into the last level and the penultimate level is a run (big sstable partitioned into multiple smaller ones)
+	err := mergeGenerators(gen1, gen2, writer, (lsmConfig.MaxLevel > 2 && levelNum == maxLevelNum))
+	return tables, err
 }
 
 // ...
-func MergeTableWithRun(table *SSTable, run ...*SSTable) {
-
+func MergeTableWithRun(
+	compressionDict *compression.Dictionary,
+	sstableConfig *util.SSTableConfig,
+	lsmConfig *util.LSMTreeConfig,
+	levelNum int,
+	table *SSTable,
+	run ...*SSTable,
+) (err error) {
+	return fmt.Errorf("not implemented yet :(")
 }

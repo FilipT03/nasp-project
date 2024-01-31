@@ -35,11 +35,6 @@ import (
   		/^usertable-(\d{5,})-Filter.db$/
 */
 
-const (
-	// The level number of the first level of SSTables in the LSM tree. This is where Memtables are flushed to.
-	FirstLevelNum = 1
-)
-
 func levelDirPath(savePath string, level int) string {
 	return filepath.Join(savePath, fmt.Sprintf("L%03d", level))
 }
@@ -134,7 +129,7 @@ func SortSSTablesByLabelNum(tables []*sstable.SSTable, reverse ...bool) {
 func GetLSMTreeNoexcept(savePath string, sortedByLabel ...bool) (levels [][]*sstable.SSTable) {
 	sort := len(sortedByLabel) != 0 && sortedByLabel[0]
 
-	for levelNum := FirstLevelNum; ; levelNum++ {
+	for levelNum := util.LSMFirstLevelNum; ; levelNum++ {
 		level, err := GetSSTablesForLevel(savePath, levelNum)
 		if err != nil {
 			break

@@ -18,7 +18,7 @@ func ShouldCompact(
 	level ...*sstable.SSTable,
 ) (bool, error) {
 
-	maxLevelNum := lsmConfig.MaxLevel - 1 + lsm.FirstLevelNum // we will always have at most MaxLevel levels
+	maxLevelNum := lsmConfig.MaxLevel - 1 + util.LSMFirstLevelNum // we will always have at most MaxLevel levels
 	if levelNum == maxLevelNum {
 		// the last level should never be compacted
 		return false, nil
@@ -59,7 +59,7 @@ func exceedsSize(level []*sstable.SSTable, size int64) bool {
 // calculates the max size for a level
 func calcSize(levelNum, firstLevelTotalDataSize, fanoutSize int64) int64 {
 	result := firstLevelTotalDataSize
-	for i := int64(0); i < levelNum-lsm.FirstLevelNum; i++ {
+	for i := int64(0); i < levelNum-util.LSMFirstLevelNum; i++ {
 		result *= fanoutSize
 	}
 
