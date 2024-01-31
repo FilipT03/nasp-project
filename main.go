@@ -32,5 +32,7 @@ func main() {
 	} else {
 		fmt.Println(val)
 	}
+
+	app.Start(db)
 	//}
 }
