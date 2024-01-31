@@ -19,12 +19,12 @@ func Start(db *KeyValueStore) {
 		in := bufio.NewReader(os.Stdin)
 		input, err := in.ReadString('\n')
 		if err != nil {
-			fmt.Println("\nError: " + err.Error())
+			fmt.Println("Error: " + err.Error())
 			continue
 		}
 		exit, err := parseAndExecute(input, db)
 		if err != nil {
-			fmt.Println("\nError: " + err.Error())
+			fmt.Println("Error: " + err.Error())
 			continue
 		}
 		if exit {
@@ -238,7 +238,7 @@ func parseKeyValueArguments(parts []string) (string, []byte, error) {
 	} else if len(parts) == 3 {
 		return parts[1], []byte(parts[2]), nil
 	} else {
-		if isFlag(parts[2], "s") {
+		if !isFlag(parts[2], "s") {
 			return "", nil, errors.New("invalid arguments")
 		}
 		value, err := readFile(parts[3])
@@ -274,15 +274,15 @@ func readFile(path string) ([]byte, error) {
 
 func help() {
 	fmt.Println("General:")
-	fmt.Println("  PUT key <value | -s value-source-file>")
-	fmt.Println("  GET key [-d destination [-a(append)]]")
+	fmt.Println("  PUT key <value | -s valueSourceFile>")
+	fmt.Println("  GET key [-d destinationFile [-a(append)]]")
 	fmt.Println("  DELETE key")
 	fmt.Println("  HELP | ? | COMMANDS")
 	fmt.Println("  EXIT | QUIT | Q")
 	fmt.Println()
 	fmt.Println("Scans:")
 	fmt.Println("  RangeScan startKey(inclusive) endKey(inclusive)")
-	fmt.Println("  PrefixScan startKey(inclusive) endKey(inclusive)")
+	fmt.Println("  PrefixScan prefix")
 	fmt.Println()
 	fmt.Println("Bloom Filter:")
 	fmt.Println("  NewBF key n(number of elements) p(false-positive probability)")
