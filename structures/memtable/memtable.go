@@ -260,3 +260,23 @@ func (mts *Memtables) PrefixScan(prefix []byte) []*model.Record {
 
 	return records
 }
+
+// Reconstruct fills Memtables with records from the Write-Ahead Log (WAL).
+// It returns the ending point (fileIndex and offset) of each Memtable.
+func (mts *Memtables) Reconstruct(records []*model.Record, fileIndex []uint32, walOffset []uint64) ([]uint32, []uint64) {
+	fileIndexes := make([]uint32, 0)
+	byteOffsets := make([]uint64, 0)
+
+	for idx, record := range records {
+		mt := mts.tables[mts.currentIndex]
+		if mt.structure.IsFull() {
+			fileIndexes = append(fileIndexes, fileIndex[idx])
+			byteOffsets = append(byteOffsets, walOffset[idx])
+			mts.currentIndex = (mts.currentIndex + 1) % mts.maxTables
+			mt = mts.tables[mts.currentIndex]
+		}
+		_ = mt.structure.Add(record)
+	}
+
+	return fileIndexes, byteOffsets
+}

@@ -520,3 +520,132 @@ func TestMergeSSTablesSameKey(t *testing.T) {
 		t.Errorf("Expected value of 'value2', got %v", dr.Value)
 	}
 }
+
+func TestIterator(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "sstable_test_")
+	if err != nil {
+		t.Fatalf("Failed to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	config := &util.SSTableConfig{
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
+		Compression:         false,
+	}
+
+	// Create some sample data records.
+	recs := []model.Record{
+		{Key: []byte("key1"), Value: []byte("value1"), Timestamp: 1},
+		{Key: []byte("key2"), Value: []byte("value2"), Timestamp: 2},
+		{Key: []byte("key3"), Value: []byte("value3"), Timestamp: 3},
+		{Key: []byte("key4"), Value: []byte("value4"), Timestamp: 4},
+	}
+
+	sstable, err := CreateSSTable(recs, nil, config)
+	if err != nil {
+		t.Errorf("Failed to create SSTable: %v", err)
+	}
+
+	it, err := sstable.NewIterator(nil)
+	if err != nil {
+		t.Errorf("Failed to create iterator: %v", err)
+	}
+
+	for it.Next() {
+		rec := it.Value()
+		if rec == nil {
+			t.Errorf("Expected a record, got nil")
+		}
+	}
+}
+
+func TestRangeIterator(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "sstable_test_")
+	if err != nil {
+		t.Fatalf("Failed to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	config := &util.SSTableConfig{
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
+		Compression:         false,
+	}
+
+	// Create some sample data records.
+	recs := []model.Record{
+		{Key: []byte("key1"), Value: []byte("value1"), Timestamp: 1},
+		{Key: []byte("key2"), Value: []byte("value2"), Timestamp: 2},
+		{Key: []byte("key3"), Value: []byte("value3"), Timestamp: 3},
+		{Key: []byte("key4"), Value: []byte("value4"), Timestamp: 4},
+	}
+
+	sstable, err := CreateSSTable(recs, nil, config)
+	if err != nil {
+		t.Errorf("Failed to create SSTable: %v", err)
+	}
+
+	it, err := sstable.NewRangeIterator([]byte("key1"), []byte("key3"), nil)
+	if err != nil {
+		t.Errorf("Failed to create iterator: %v", err)
+	}
+
+	for it.Next() {
+		rec := it.Value()
+		if rec == nil {
+			t.Errorf("Expected a record, got nil")
+		}
+	}
+}
+
+func TestPrefixIterator(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "sstable_test_")
+	if err != nil {
+		t.Fatalf("Failed to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	config := &util.SSTableConfig{
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
+		Compression:         false,
+	}
+
+	// Create some sample data records.
+	recs := []model.Record{
+		{Key: []byte("key1"), Value: []byte("value1"), Timestamp: 1},
+		{Key: []byte("key2"), Value: []byte("value2"), Timestamp: 2},
+		{Key: []byte("key3"), Value: []byte("value3"), Timestamp: 3},
+		{Key: []byte("key4"), Value: []byte("value4"), Timestamp: 4},
+	}
+
+	sstable, err := CreateSSTable(recs, nil, config)
+	if err != nil {
+		t.Errorf("Failed to create SSTable: %v", err)
+	}
+
+	it, err := sstable.NewPrefixIterator([]byte("key"), nil)
+	if err != nil {
+		t.Errorf("Failed to create iterator: %v", err)
+	}
+
+	for it.Next() {
+		rec := it.Value()
+		if rec == nil {
+			t.Errorf("Expected a record, got nil")
+		}
+	}
+}
