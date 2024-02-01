@@ -302,7 +302,7 @@ func mergeGeneratorsWithLimit(
 // The newly generated tables are labeled with the first free label in the level, and their proxy objects are returned as a slice.
 // It skips deleted records if possible (when merging from a run into the last level run).
 // Returns error if merging or any part of the cleanup fails.
-// If merging is successfull the input table files are deleted.
+// If merging is successfull the input table files are deleted, otherwise the lsm tree will stay unchanged.
 func MergeTableWithRun(
 	compressionDict *compression.Dictionary,
 	sstableConfig *util.SSTableConfig,
@@ -310,7 +310,7 @@ func MergeTableWithRun(
 	levelNum int,
 	table *SSTable,
 	run ...*SSTable,
-) (newTables []*SSTable, err error) {
+) (newTables []*SSTable, err error) { // could make this take two runs
 	// used for merging
 	var tableGen, runGen *DataRecordGenerator
 
@@ -333,7 +333,7 @@ func MergeTableWithRun(
 	// cleanup after we are done
 	defer func() {
 		if err == nil {
-			// deleting files for the old SSTables from disc only if merge was sucessful
+			// merge was successfull deleting files for the old SSTables from disc
 			for _, table := range append(run, table) {
 				if cerr := table.deleteFiles(); cerr != nil {
 					err = fmt.Errorf("%w && failed to delete files for SSTable '%s' from disc : %w", err, table.TOCFilename, cerr)
@@ -341,8 +341,20 @@ func MergeTableWithRun(
 				// we delete all tables even if one deletion fails
 			}
 		} else {
-			err = fmt.Errorf("deletion of old table files was aborted : %w", err)
-			// NOTE: here we could go through the newTables and delete their files
+			// merge was unsuccessfull deleting new tables that were created in the partial merge
+			var derr error
+			for _, newTable := range newTables {
+				if err := newTable.deleteFiles(); err != nil {
+					derr = fmt.Errorf("%w && failed to delete files for newly created SSTable '%s' ", derr, newTable.TOCFilename)
+				}
+				// we delete all tables even if one deletion fails
+			}
+
+			if derr == nil {
+				err = fmt.Errorf("failed to merge the given tables : %w", err)
+			} else {
+				err = fmt.Errorf("failed to merge the given tables : %w [while handling the previous error new one occured : %w]", err, derr)
+			}
 		}
 
 		// clearing generators
@@ -359,6 +371,5 @@ func MergeTableWithRun(
 	skipDeleted := lsmConfig.MaxLevel > 2 && levelNum == maxLevelNum
 
 	newTables, err = mergeGeneratorsWithLimit(tableGen, runGen, levelNum, compressionDict, sstableConfig, lsmConfig, skipDeleted)
-	// TODO: should see what to do if error, because we may still have old tables and some new ones
 	return newTables, err
 }
