@@ -45,6 +45,14 @@ func parseAndExecute(input string, db *KeyValueStore) (bool, error) {
 	if parts == nil {
 		return false, errors.New("invalid command")
 	}
+	for i := 2; i < len(parts); i++ {
+		if len(parts[i]) < 3 {
+			continue
+		}
+		if strings.HasPrefix(parts[i], "\"") && strings.HasSuffix(parts[i], "\"") {
+			parts[i] = parts[i][1 : len(parts[i])-1]
+		}
+	}
 	switch strings.ToLower(parts[0]) {
 	case "help", "?", "commands":
 		help()
