@@ -409,12 +409,10 @@ func (wal *WAL) writeSlice(remainderSize uint64, slice []byte, path string) erro
 	}
 	fileSize := fi.Size()
 	if fileSize == 0 && uint64(len(slice))+uint64(HeaderSize) > wal.segmentSize {
-		panic(errors.New("failed to write slice, data would exceed the segment size"))
-		//return errors.New("failed to write slice, data would exceed the segment size")
+		return errors.New("failed to write slice, data would exceed the segment size")
 	}
 	if fileSize != 0 && uint64(len(slice))+uint64(fileSize) > wal.segmentSize {
-		panic(errors.New("failed to write slice, data would exceed the segment size"))
-		//return errors.New("failed to write slice, data would exceed the segment size")
+		return errors.New("failed to write slice, data would exceed the segment size")
 	}
 
 	if fileSize == 0 {
