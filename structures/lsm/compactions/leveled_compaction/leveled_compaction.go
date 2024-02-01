@@ -118,7 +118,7 @@ func triggerCompaction(
 
 		nextLevelNum := levelNum + 1
 		// selecting the range of tables from next level to compact with
-		overlapTables, err = getSSTablesForLevelThatOverlapRange(levelNum, selectedTable.Summary.StartKey, selectedTable.Summary.EndKey, sstableConfig.SavePath, compressionDict)
+		overlapTables, err = getSSTablesForLevelThatOverlapRange(nextLevelNum, selectedTable.Summary.StartKey, selectedTable.Summary.EndKey, sstableConfig.SavePath, compressionDict)
 		if err != nil {
 			// this may happen if summary check for next level tables fails
 			return fmt.Errorf("compaction from level %d failed, couldn't select overlap tables from next level : %w", levelNum, err)
@@ -207,6 +207,6 @@ func getSSTablesForLevelThatOverlapRange(
 	return selection, nil
 }
 
-func fixLabelsForLevel(addedTables []*sstable.SSTable, levelNum int) error {
+func fixLabelsForLevel(addedTables []*sstable.SSTable, levelNum int) error { // NOTE: this may require old table proxies too
 	return fmt.Errorf("not implemented yet :(")
 }
