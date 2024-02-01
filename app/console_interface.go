@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// Start the console interface.
 func Start(db *KeyValueStore) {
 	fmt.Println("Type HELP for list of commands")
 	for {
@@ -37,6 +38,7 @@ func Start(db *KeyValueStore) {
 	}
 }
 
+// parseAndExecute parses the input string into commands and executes them. Returns true if exiting.
 func parseAndExecute(input string, db *KeyValueStore) (bool, error) {
 	r := regexp.MustCompile(`[^\s"']+|"([^"]*)"|'([^']*)'`)
 	parts := r.FindAllString(input, -1)
@@ -239,6 +241,7 @@ func parseAndExecute(input string, db *KeyValueStore) (bool, error) {
 	}
 }
 
+// parseKeyValueArguments reads key and value arguments from separated input for format: key <value | -s valueSourceFile>
 func parseKeyValueArguments(parts []string) (string, []byte, error) {
 	if len(parts) < 3 {
 		return "", nil, errors.New("invalid arguments")
@@ -253,11 +256,13 @@ func parseKeyValueArguments(parts []string) (string, []byte, error) {
 	}
 }
 
+// isFlag checks if the argument is a flag of the given character.
 func isFlag(argument string, flag string) bool {
 	return strings.ToLower(argument) == "-"+strings.ToLower(flag) ||
 		strings.ToLower(argument) == "/"+strings.ToLower(flag)
 }
 
+// readFile reads all bytes from a file and returns them.
 func readFile(path string) ([]byte, error) {
 	f, err := os.OpenFile(path, os.O_RDONLY, 0644)
 	if err != nil {
@@ -279,6 +284,7 @@ func readFile(path string) ([]byte, error) {
 	return result, nil
 }
 
+// help prints all commands.
 func help() {
 	fmt.Println("General:")
 	fmt.Println("  PUT key <value | -s valueSourceFile>")
