@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"nasp-project/app"
 	"nasp-project/util"
 )
@@ -16,7 +15,7 @@ func main() {
 
 	//for i := 0; i < 1050; i++ {
 	//	key := fmt.Sprintf("key%d", i)
-	key := "hey"
+	/*key := "hey"
 
 	err = db.Put(key, []byte{1, 2, 3})
 	if err != nil {
@@ -31,7 +30,7 @@ func main() {
 		fmt.Println("empty")
 	} else {
 		fmt.Println(val)
-	}
+	}*/
 
 	app.Start(db)
 	//}

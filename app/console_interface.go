@@ -40,6 +40,9 @@ func Start(db *KeyValueStore) {
 func parseAndExecute(input string, db *KeyValueStore) (bool, error) {
 	r := regexp.MustCompile(`[^\s"']+|"([^"]*)"|'([^']*)'`)
 	parts := r.FindAllString(input, -1)
+	if parts == nil {
+		return false, errors.New("invalid command")
+	}
 	switch strings.ToLower(parts[0]) {
 	case "help", "?", "commands":
 		help()

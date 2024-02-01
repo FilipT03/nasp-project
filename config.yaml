@@ -1,5 +1,5 @@
 WAL:
-    segmentSize: 32768
+    segmentSize: 1048576
     bufferSize: 8
     walFolderPath: ./wal
 Memtable:

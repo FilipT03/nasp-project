@@ -333,7 +333,7 @@ func (wal *WAL) writeBuffer() error {
 			var offset uint64 = 0
 			combinedSlice := append(toWrite, nextSlice...)
 			// while there is more to write that a single file can fit
-			for uint64(len(combinedSlice))-offset > (wal.segmentSize - HeaderSize) {
+			for uint64(len(combinedSlice))-offset > (wal.segmentSize - uint64(fSize)) {
 				var err error
 				err = wal.writeSlice(nextHeader, combinedSlice[offset:offset+(wal.segmentSize-uint64(fSize))], wal.logsPath+wal.latestFileName)
 				offset += wal.segmentSize - uint64(fSize)
@@ -409,10 +409,12 @@ func (wal *WAL) writeSlice(remainderSize uint64, slice []byte, path string) erro
 	}
 	fileSize := fi.Size()
 	if fileSize == 0 && uint64(len(slice))+uint64(HeaderSize) > wal.segmentSize {
-		return errors.New("failed to write slice, data would exceed the segment size")
+		panic(errors.New("failed to write slice, data would exceed the segment size"))
+		//return errors.New("failed to write slice, data would exceed the segment size")
 	}
 	if fileSize != 0 && uint64(len(slice))+uint64(fileSize) > wal.segmentSize {
-		return errors.New("failed to write slice, data would exceed the segment size")
+		panic(errors.New("failed to write slice, data would exceed the segment size"))
+		//return errors.New("failed to write slice, data would exceed the segment size")
 	}
 
 	if fileSize == 0 {
@@ -478,7 +480,7 @@ func (wal *WAL) GetAllRecords() ([]*model.Record, []uint32, []uint64, error) {
 	} else {
 		toSkip = startFileIndex - uint32(oldestFileIndex)
 		if toSkip < 0 {
-			return nil, nil, nil, errors.New("error: memtable indexing file referencing non existent files")
+			return nil, nil, nil, errors.New("memtable indexing file referencing non existent files")
 		}
 	}
 
