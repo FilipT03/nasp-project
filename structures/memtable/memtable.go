@@ -113,7 +113,10 @@ func (mts *Memtables) Get(key []byte) (*model.Record, error) {
 		if err == nil {
 			return record, nil
 		}
-		index = (index - 1) % mts.maxTables
+		index -= 1
+		if index < 0 {
+			index = mts.maxTables - 1
+		}
 		if index == mts.currentIndex {
 			break
 		}
