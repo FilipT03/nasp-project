@@ -6,8 +6,6 @@ import (
 	"nasp-project/structures/hash"
 )
 
-//promjeniti sve da f ije primaju baj slice umjesto stringova i napraviti serialize i desialize f ije
-
 type CMS struct {
 	matrix [][]byte
 	rows   uint
