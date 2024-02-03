@@ -237,19 +237,26 @@ func mergeGeneratorsWithLimit(
 
 	var currentWrittenBytes int64
 	var currentWrittenRecords uint
+	// append current table to tables and build it
+	sendCurrentTable := func() error {
+		// we add it even if build fails because it is already written to disc
+		tables = append(tables, currentTable)
+
+		currentTable.Data.Size = currentWrittenBytes
+		if berr := currentTable.BuildFromDataBlock(currentWrittenRecords, compressionDict, sstableConfig); berr != nil {
+			return fmt.Errorf("failed to build table at level %d from data block '%s' : %w", levelNum, currentTable.Data.Filename, berr)
+		}
+
+		return nil
+	}
 
 	// switch to new SSTable, its data block and open its data block file
 	newTable := func() error {
 		// every time except the first time
 		if currentTable != nil {
-			// we add it even if build fails because it is already written to disc
-			tables = append(tables, currentTable)
-
-			currentTable.Data.Size = currentWrittenBytes
-			if berr := currentTable.BuildFromDataBlock(currentWrittenRecords, compressionDict, sstableConfig); berr != nil {
-				return fmt.Errorf("failed to build table at level %d from data block '%s' : %w", levelNum, currentTable.Data.Filename, berr)
+			if err := sendCurrentTable(); err != nil {
+				return err
 			}
-
 		}
 
 		nextTable, err := initializeSSTable(levelNum, sstableConfig)
@@ -301,22 +308,20 @@ func mergeGeneratorsWithLimit(
 		return nil
 	}
 
+	// run the whole merging process
 	err := mergeGenerators(gen1, gen2, writer, skipDeleted...)
 
 	// we are left with unfinished last table that is not in the tables slice
+	// TODO: see if this should be done even if merging process fails
 	if currentWrittenBytes > 0 {
-		// if any records are written we build it
-		tables = append(tables, currentTable)
-
-		currentTable.Data.Size = currentWrittenBytes
-		if berr := currentTable.BuildFromDataBlock(currentWrittenRecords, compressionDict, sstableConfig); berr != nil {
-			return tables, fmt.Errorf("failed to build table at level %d from data block '%s' : %w", levelNum, currentTable.Data.Filename, berr)
+		// if any records were written build and add it to tables
+		if berr := sendCurrentTable(); berr != nil {
+			return tables, berr
 		}
 	} else {
-		// otherwise we delete empty files
-		err := currentTable.deleteFiles()
-		if err != nil {
-			return tables, fmt.Errorf("failed to delete files for empty table '%s' : %w", currentTable.TOCFilename, err)
+		// otherwise delete empty files
+		if derr := currentTable.deleteFiles(); derr != nil {
+			return tables, fmt.Errorf("failed to delete files for empty table '%s' : %w", currentTable.TOCFilename, derr)
 		}
 	}
 

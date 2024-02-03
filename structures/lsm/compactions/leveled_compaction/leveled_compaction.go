@@ -9,7 +9,7 @@ import (
 	"nasp-project/util"
 )
 
-const useSpecialSelectionForFirstLevel = false
+const useSpecialSelectionForFirstLevel = true
 
 // Check if the level needs compaction according to the given lsmConfig. The level given must be a valid level.
 // If SSTables are not provided it fetches them and then checks, otherwise assumes that the given tables are all tables from the level.
@@ -175,7 +175,7 @@ func selectTable(savePath string, levelNum int) (*sstable.SSTable, error) {
 		return nil, fmt.Errorf("level %d is empty", levelNum)
 	}
 
-	return level[0], nil // maby temporary maby change :)
+	return level[0], nil
 }
 
 // getSSTablesForLevelThatOverlapRange finds all SSTables on levelNum-th level and returns them.
