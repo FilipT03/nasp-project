@@ -47,17 +47,21 @@ func tOCFileName(labelNum int) string {
 	return fmt.Sprintf("usertable-%05d-TOC.txt", labelNum)
 }
 
-// Returns the file paths for TOC files from every SSTable on the given level.
+// GetTOCFilePathsForLevel returns the file paths for TOC files from every SSTable on the given level.
 // It takes savePath, the base directory where all levels of LSM tree are stored, and the level to consider.
 // Returns error if reading the TOC directory of the level fails.
 func GetTOCFilePathsForLevel(savePath string, level int) ([]string, error) {
 	dir := tOCDirPath(savePath, level)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+
 		return nil, fmt.Errorf("failed to read level %d TOC directory '%s' : %w", level, dir, err)
 	}
 
-	tocPaths := []string{}
+	var tocPaths []string
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			// we assume that all files in toc directory are toc files
@@ -68,7 +72,7 @@ func GetTOCFilePathsForLevel(savePath string, level int) ([]string, error) {
 	return tocPaths, nil
 }
 
-// Get all SSTables from the given level. It takes savePath, a base directory where all levels of LSM tree are stored, and the level to consider.
+// Get all SSTables sorted by label from the given level. It takes savePath, a base directory where all levels of LSM tree are stored, and the level to consider.
 // If reading a TOC directory fails it returns nil and error.
 // If opening an SSTable from a TOC file fails it returns a slice of successfully opened SSTables and error.
 func GetSSTablesForLevel(savePath string, level int) ([]*sstable.SSTable, error) {
@@ -88,10 +92,11 @@ func GetSSTablesForLevel(savePath string, level int) ([]*sstable.SSTable, error)
 		tables = append(tables, table)
 	}
 
+	SortSSTablesByLabelNum(tables)
 	return tables, nil
 }
 
-// extracts label number from TOC file name
+// GetLabelNumFromSSTable extracts label number from TOC file name
 func getLabelNumFromSSTable(table *sstable.SSTable) int {
 	re := regexp.MustCompile(`usertable-(\d+)-TOC.txt`)
 	match := re.FindStringSubmatch(table.TOCFilename)

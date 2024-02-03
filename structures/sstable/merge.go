@@ -167,11 +167,11 @@ func mergeGenerators(gen1, gen2 *DataRecordGenerator, consumer func(*DataRecord)
 	}
 
 	var sentinel *DataRecord = nil
-	// loop until both generators are exausted
+	// loop until both generators are exhausted
 	for rec1 != sentinel || rec2 != sentinel {
 
 		if rec1 == sentinel {
-			// first generator is exausted, sending second
+			// first generator is exhausted, sending second
 			if sendRecord(rec2); err != nil {
 				return err
 			}
@@ -184,7 +184,7 @@ func mergeGenerators(gen1, gen2 *DataRecordGenerator, consumer func(*DataRecord)
 		}
 
 		if rec2 == sentinel {
-			// second generator is exausted, sending first
+			// second generator is exhausted, sending first
 			if sendRecord(rec1); err != nil {
 				return err
 			}
@@ -196,7 +196,7 @@ func mergeGenerators(gen1, gen2 *DataRecordGenerator, consumer func(*DataRecord)
 			continue
 		}
 
-		// neither generator is exausted, comparing records and selecting one to send
+		// neither generator is exhausted, comparing records and selecting one to send
 		theChosenOne := chooseRecord(rec1, rec2)
 		if sendRecord(theChosenOne); err != nil {
 			return err
@@ -240,18 +240,21 @@ func mergeGeneratorsWithLimit(
 
 	// switch to new SSTable, its data block and open its data block file
 	newTable := func() error {
-		nextTable, err := initializeSSTable(levelNum, sstableConfig)
-		if err != nil {
-			return fmt.Errorf("failed to switch to a new SSTable, couldn't initialize a new table at level %d : %w", levelNum, err)
-		}
 		// every time except the first time
 		if currentTable != nil {
 			// we add it even if build fails because it is already written to disc
 			tables = append(tables, currentTable)
 
+			currentTable.Data.Size = currentWrittenBytes
 			if berr := currentTable.BuildFromDataBlock(currentWrittenRecords, compressionDict, sstableConfig); berr != nil {
 				return fmt.Errorf("failed to build table at level %d from data block '%s' : %w", levelNum, currentTable.Data.Filename, berr)
 			}
+
+		}
+
+		nextTable, err := initializeSSTable(levelNum, sstableConfig)
+		if err != nil {
+			return fmt.Errorf("failed to switch to a new SSTable, couldn't initialize a new table at level %d : %w", levelNum, err)
 		}
 
 		currentTable = nextTable
@@ -266,7 +269,11 @@ func mergeGeneratorsWithLimit(
 		if err != nil {
 			return fmt.Errorf("failed to switch to a new SSTable, couldn't open the data block file '%s' : %w", nextTable.Data.Filename, err)
 		}
-		// see if should seek begining of db
+
+		if _, err = currentFile.Seek(nextTable.Data.StartOffset, 0); err != nil {
+			return fmt.Errorf("failed to switch to a new SSTable, couldn't seek data block file '%s' to start of the data block : %w", nextTable.Data.Filename, err)
+		}
+
 		return nil
 	}
 
@@ -295,6 +302,24 @@ func mergeGeneratorsWithLimit(
 	}
 
 	err := mergeGenerators(gen1, gen2, writer, skipDeleted...)
+
+	// we are left with unfinished last table that is not in the tables slice
+	if currentWrittenBytes > 0 {
+		// if any records are written we build it
+		tables = append(tables, currentTable)
+
+		currentTable.Data.Size = currentWrittenBytes
+		if berr := currentTable.BuildFromDataBlock(currentWrittenRecords, compressionDict, sstableConfig); berr != nil {
+			return tables, fmt.Errorf("failed to build table at level %d from data block '%s' : %w", levelNum, currentTable.Data.Filename, berr)
+		}
+	} else {
+		// otherwise we delete empty files
+		err := currentTable.deleteFiles()
+		if err != nil {
+			return tables, fmt.Errorf("failed to delete files for empty table '%s' : %w", currentTable.TOCFilename, err)
+		}
+	}
+
 	return tables, err
 }
 
@@ -320,7 +345,7 @@ func MergeTableWithRun(
 	}
 
 	// sstable -> data block
-	runBlocks := make([]*DataBlock, len(run))
+	runBlocks := make([]*DataBlock, 0, len(run))
 	for _, table := range run {
 		runBlocks = append(runBlocks, &table.Data) // just in case
 	}
@@ -349,6 +374,8 @@ func MergeTableWithRun(
 				}
 				// we delete all tables even if one deletion fails
 			}
+
+			newTables = nil
 
 			if derr == nil {
 				err = fmt.Errorf("failed to merge the given tables : %w", err)
