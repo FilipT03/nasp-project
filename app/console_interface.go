@@ -4,10 +4,16 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"nasp-project/model"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
+)
+
+const (
+	defaultPageSize    = 30
+	maxScanValueLength = 300
 )
 
 // Start the console interface.
@@ -110,9 +116,73 @@ func parseAndExecute(input string, db *KeyValueStore) (bool, error) {
 		err := db.Delete(parts[1])
 		return false, err
 	case "rangescan":
-		return false, errors.New("not implemented")
+		if len(parts) < 3 {
+			return false, errors.New("invalid arguments")
+		}
+		var pageNumber uint64 = 1
+		var pageSize uint64 = defaultPageSize
+		var err error
+		if len(parts) > 3 {
+			pageNumber, err = strconv.ParseUint(parts[3], 10, 32)
+			if err != nil {
+				return false, err
+			}
+		}
+		if len(parts) > 4 {
+			pageSize, err = strconv.ParseUint(parts[4], 10, 32)
+			if err != nil {
+				return false, err
+			}
+		}
+		records := []*model.Record{{[]byte("test"), []byte("test"), false, 0},
+			{[]byte("test"), []byte(strings.Repeat("test", 500)), false, 0}}
+		if err != nil {
+			return false, err
+		}
+		fmt.Printf("Page %d, page size %d\n", pageNumber, pageSize)
+		fmt.Println("(K - key, V - value)")
+		for i, record := range records {
+			if len(record.Value) > maxScanValueLength {
+				fmt.Printf("  Record %d - K: %s  V: %s...\n", i, string(record.Key), string(record.Value[:maxScanValueLength]))
+			} else {
+				fmt.Printf("  Record %d - K: %s  V: %s\n", i, string(record.Key), string(record.Value))
+			}
+		}
+		return false, nil
 	case "prefixscan":
-		return false, errors.New("not implemented")
+		if len(parts) < 2 {
+			return false, errors.New("invalid arguments")
+		}
+		var pageNumber uint64 = 1
+		var pageSize uint64 = defaultPageSize
+		var err error
+		if len(parts) > 2 {
+			pageNumber, err = strconv.ParseUint(parts[2], 10, 32)
+			if err != nil {
+				return false, err
+			}
+		}
+		if len(parts) > 3 {
+			pageSize, err = strconv.ParseUint(parts[3], 10, 32)
+			if err != nil {
+				return false, err
+			}
+		}
+		records := []*model.Record{{[]byte("test"), []byte("test"), false, 0},
+			{[]byte("test"), []byte(strings.Repeat("test", 500)), false, 0}}
+		if err != nil {
+			return false, err
+		}
+		fmt.Printf("Page %d, page size %d\n", pageNumber, pageSize)
+		fmt.Println("(K - key, V - value)")
+		for i, record := range records {
+			if len(record.Value) > maxScanValueLength {
+				fmt.Printf("  Record %d - K: %s  V: %s...\n", i, string(record.Key), string(record.Value[:maxScanValueLength]))
+			} else {
+				fmt.Printf("  Record %d - K: %s  V: %s\n", i, string(record.Key), string(record.Value))
+			}
+		}
+		return false, nil
 	case "newbf":
 		if len(parts) < 4 {
 			return false, errors.New("invalid arguments")
@@ -302,8 +372,8 @@ func help() {
 	fmt.Println("  EXIT | QUIT | Q")
 	fmt.Println()
 	fmt.Println("Scans:")
-	fmt.Println("  RangeScan startKey(inclusive) endKey(inclusive)")
-	fmt.Println("  PrefixScan prefix")
+	fmt.Println("  RangeScan startKey(inclusive) endKey(inclusive) [pageNumber] [pageSize]")
+	fmt.Println("  PrefixScan prefix [pageNumber] [pageSize]")
 	fmt.Println()
 	fmt.Println("Bloom Filter:")
 	fmt.Println("  NewBF key n(number of elements) p(false-positive probability)")
