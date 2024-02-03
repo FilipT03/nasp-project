@@ -21,7 +21,12 @@ SSTable:
 LSMTree:
     maxLevel: 4
     compactionAlgorithm: Size-Tiered # Size-Tiered, Leveled
-    maxLsmNodesPerLevel: 8
+    SizeTiered:
+        maxLsmNodesPerLevel: 8
+    Leveled:
+        dataBlockSize: 160_000
+        firstLevelTotalDataSize: 1_000_000
+        fanoutSize: 10
 Cache:
     maxSize: 1024
 TokenBucket:

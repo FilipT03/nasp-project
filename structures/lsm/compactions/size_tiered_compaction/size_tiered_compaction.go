@@ -13,7 +13,7 @@ func Compact(compressionDict *compression.Dictionary, sstableConfig *util.SSTabl
 	// maximum number of levels in the LSM tree
 	maxLsmLevel := lsmConfig.MaxLevel
 	// maximum number of SSTables in each level of the LSM Tree
-	maxLsmNodesPerLevel := lsmConfig.MaxLsmNodesPerLevel
+	maxLsmNodesPerLevel := lsmConfig.SizeTiered.MaxLsmNodesPerLevel
 	// filepath
 	filepath := sstableConfig.SavePath
 

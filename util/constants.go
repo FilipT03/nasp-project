@@ -9,3 +9,5 @@ const BloomFilterPrefix = "__BF_"
 const CountMinSketchPrefix = "__CMS_"
 const HyperLogLogPrefix = "__HLL_"
 const SimHashPrefix = "__SH_"
+
+const LSMFirstLevelNum = 1
