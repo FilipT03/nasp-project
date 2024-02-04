@@ -65,6 +65,11 @@ func (sl *SkipList) NewRangeIterator(startKey []byte, endKey []byte) (util.Itera
 	if err != nil {
 		return nil, err
 	}
+
+	if iter.Value() == nil {
+		return nil, errors.New("error: could not find startKey")
+	}
+
 	for bytes.Compare(iter.Value().Key, startKey) < 0 {
 		if !iter.Next() {
 			return nil, errors.New("error: could not find startKey")
@@ -99,6 +104,9 @@ func (sl *SkipList) NewPrefixIterator(prefix []byte) (util.Iterator, error) {
 		return nil, err
 	}
 
+	if iter.Value() == nil {
+		return nil, errors.New("error: could not find prefix")
+	}
 	for !bytes.HasPrefix(iter.Value().Key, prefix) {
 		if !iter.Next() {
 			return nil, errors.New("error: could not find prefix")
