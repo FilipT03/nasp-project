@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"nasp-project/model"
 	"os"
 	"regexp"
 	"strconv"
@@ -134,8 +133,7 @@ func parseAndExecute(input string, db *KeyValueStore) (bool, error) {
 				return false, err
 			}
 		}
-		records := []*model.Record{{[]byte("test"), []byte("test"), false, 0},
-			{[]byte("test"), []byte(strings.Repeat("test", 500)), false, 0}}
+		records, err := db.RangeScan(parts[1], parts[2], int(pageNumber), int(pageSize))
 		if err != nil {
 			return false, err
 		}
@@ -168,8 +166,7 @@ func parseAndExecute(input string, db *KeyValueStore) (bool, error) {
 				return false, err
 			}
 		}
-		records := []*model.Record{{[]byte("test"), []byte("test"), false, 0},
-			{[]byte("test"), []byte(strings.Repeat("test", 500)), false, 0}}
+		records, err := db.PrefixScan(parts[1], int(pageNumber), int(pageSize))
 		if err != nil {
 			return false, err
 		}
