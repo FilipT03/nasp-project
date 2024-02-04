@@ -103,7 +103,7 @@ func (kvs *KeyValueStore) Delete(key string) error {
 func (kvs *KeyValueStore) get(key string) ([]byte, error) {
 	keyBytes := []byte(key)
 
-	compressionDict, err := kvs.getCompressionDict(key)
+	compressionDict, err := kvs.getCompressionDict()
 	if err != nil {
 		return nil, err
 	}

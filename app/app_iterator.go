@@ -42,7 +42,7 @@ func (kvs *KeyValueStore) RangeIterate(minKey, maxKey string) (*Iterator, error)
 		return nil, errors.New("rate limit reached")
 	}
 
-	compressionDict, err := kvs.getCompressionDict("") // dict with all keys loaded
+	compressionDict, err := kvs.getCompressionDict()
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (kvs *KeyValueStore) PrefixIterate(prefix string) (*Iterator, error) {
 		return nil, errors.New("rate limit reached")
 	}
 
-	compressionDict, err := kvs.getCompressionDict("") // dict with all keys loaded
+	compressionDict, err := kvs.getCompressionDict()
 	if err != nil {
 		return nil, err
 	}

@@ -20,7 +20,7 @@ func (kvs *KeyValueStore) RangeScan(minKey, maxKey string, pageNumber, pageSize 
 		return nil, errors.New("rate limit reached")
 	}
 
-	compressionDict, err := kvs.getCompressionDict("") // dict with all keys loaded
+	compressionDict, err := kvs.getCompressionDict()
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (kvs *KeyValueStore) PrefixScan(prefix string, pageNumber, pageSize int) ([
 		return nil, errors.New("rate limit reached")
 	}
 
-	compressionDict, err := kvs.getCompressionDict("") // dict with all keys loaded
+	compressionDict, err := kvs.getCompressionDict()
 	if err != nil {
 		return nil, err
 	}

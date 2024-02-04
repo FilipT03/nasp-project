@@ -18,6 +18,7 @@ SSTable:
     compression: true
     filterPrecision: 0.01
     merkleTreeChunkSize: 1024
+    compressionFilename: CompressionInfo.bin
 LSMTree:
     maxLevel: 4
     compactionAlgorithm: Size-Tiered # Size-Tiered, Leveled

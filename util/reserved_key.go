@@ -6,7 +6,6 @@ import "bytes"
 // and thus must not be used as a regular key.
 func IsReservedKey(key []byte) bool {
 	reservedKeys := [][]byte{
-		[]byte(CompressionDictKey),
 		[]byte(RateLimiterKey),
 	}
 	reservedPrefixes := [][]byte{

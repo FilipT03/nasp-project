@@ -48,6 +48,7 @@ type SSTableConfig struct {
 	Compression         bool    `yaml:"compression"`
 	FilterPrecision     float64 `yaml:"filterPrecision" validate:"float_between"`
 	MerkleTreeChunkSize int64   `yaml:"merkleTreeChunkSize" validate:"gte=1"`
+	CompressionFilename string  `yaml:"compressionFilename"`
 }
 
 type LSMTreeConfig struct {
@@ -101,6 +102,7 @@ var config = &Config{
 		Compression:         true,
 		FilterPrecision:     0.01,
 		MerkleTreeChunkSize: 1024,
+		CompressionFilename: "CompressionInfo.bin",
 	},
 	LSMTree: LSMTreeConfig{
 		MaxLevel:            4,
