@@ -21,13 +21,21 @@ func (sl *SkipList) NewIterator() (util.Iterator, error) {
 		starterNode = starterNode.down
 		height--
 	}
-	return &SkipListIter{current: starterNode.next}, nil
+
+	iter := &SkipListIter{current: starterNode.next}
+	for util.IsInvalidKey(iter) {
+		starterNode = starterNode.next
+		iter.current = starterNode
+	}
+	return iter, nil
 }
 
 func (iter *SkipListIter) Next() bool {
-	if iter.current.next != nil {
+	for iter.current.next != nil {
 		iter.current = iter.current.next
-		return true
+		if !util.IsInvalidKey(iter) {
+			return true
+		}
 	}
 	iter.current = nil
 	return false

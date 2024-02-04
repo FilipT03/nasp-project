@@ -22,7 +22,7 @@ type KeyValueStore struct {
 
 // NewKeyValueStore creates an instance of Key-Value Storage engine with configuration given at ConfigPath.
 func NewKeyValueStore(config *util.Config) (*KeyValueStore, error) {
-	wal, err := writeaheadlog.NewWAL(config.WAL, config.Memtable.Instances)
+	wal, err := writeaheadlog.NewWAL(&config.WAL, config.Memtable.Instances)
 	if err != nil {
 		return nil, err
 	}

@@ -23,16 +23,24 @@ func (hm *HashMap) NewIterator() (util.Iterator, error) {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	return &HashMapIter{
+
+	iter := &HashMapIter{
 		keys:     keys,
 		hashMap:  hm,
 		index:    0,
 		maxIndex: len(hm.data),
-	}, nil
+	}
+	for util.IsInvalidKey(iter) {
+		iter.index += 1
+	}
+	return iter, nil
 }
 
 func (h *HashMapIter) Next() bool {
 	h.index += 1
+	for util.IsInvalidKey(h) {
+		h.index += 1
+	}
 	return h.index < h.maxIndex
 }
 

@@ -113,7 +113,10 @@ func (mts *Memtables) Get(key []byte) (*model.Record, error) {
 		if err == nil {
 			return record, nil
 		}
-		index = (index - 1) % mts.maxTables
+		index -= 1
+		if index < 0 {
+			index = mts.maxTables - 1
+		}
 		if index == mts.currentIndex {
 			break
 		}
@@ -153,11 +156,6 @@ func isMinimalKey(iter util.Iterator, minKey []byte, maxTimestamp uint64) bool {
 		(bytes.Equal(iter.Value().Key, minKey) && iter.Value().Timestamp > maxTimestamp))
 }
 
-// isInvalidKey checks if the key is a reserved word.
-func isInvalidKey(iter util.Iterator) bool {
-	return iter != nil && iter.Value() != nil && util.IsReservedKey(iter.Value().Key)
-}
-
 // RangeScan returns records from memtables within the inclusive range [minValue, maxValue].
 func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Record {
 	iterators := mts.GetIterators()
@@ -166,9 +164,11 @@ func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Recor
 	// Set all iterators to minValue (or first value greater than minValue)
 	for i := 0; i < len(iterators); i++ {
 		current := iterators[i]
-
-		for bytes.Compare(current.Value().Key, minValue) < 0 {
-			if !current.Next() {
+		if bytes.Compare(current.Value().Key, minValue) >= 0 {
+			continue
+		}
+		for current.Next() {
+			if bytes.Compare(current.Value().Key, minValue) >= 0 {
 				break
 			}
 		}
@@ -181,9 +181,6 @@ func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Recor
 		maxTimestamp := uint64(0)
 
 		for i, iter := range iterators {
-			for isInvalidKey(iter) {
-				iter.Next()
-			}
 			if isMinimalKey(iter, minKey, maxTimestamp) {
 				minIndex = i
 				minKey = iter.Value().Key
@@ -222,8 +219,11 @@ func (mts *Memtables) PrefixScan(prefix []byte) []*model.Record {
 	// Set all iterators to first key with prefix.
 	for i := 0; i < len(iterators); i++ {
 		current := iterators[i]
-		for !bytes.HasPrefix(current.Value().Key, prefix) {
-			if !current.Next() {
+		if bytes.HasPrefix(current.Value().Key, prefix) {
+			continue
+		}
+		for current.Next() {
+			if bytes.HasPrefix(current.Value().Key, prefix) {
 				break
 			}
 		}
@@ -236,9 +236,6 @@ func (mts *Memtables) PrefixScan(prefix []byte) []*model.Record {
 		maxTimestamp := uint64(0)
 
 		for i, iter := range iterators {
-			for isInvalidKey(iter) {
-				iter.Next()
-			}
 			if isMinimalKey(iter, minKey, maxTimestamp) {
 				minIndex = i
 				minKey = iter.Value().Key
@@ -265,4 +262,24 @@ func (mts *Memtables) PrefixScan(prefix []byte) []*model.Record {
 	}
 
 	return records
+}
+
+// Reconstruct fills Memtables with records from the Write-Ahead Log (WAL).
+// It returns the ending point (fileIndex and offset) of each Memtable.
+func (mts *Memtables) Reconstruct(records []*model.Record, fileIndex []uint32, walOffset []uint64) ([]uint32, []uint64) {
+	fileIndexes := make([]uint32, 0)
+	byteOffsets := make([]uint64, 0)
+
+	for idx, record := range records {
+		mt := mts.tables[mts.currentIndex]
+		if mt.structure.IsFull() {
+			fileIndexes = append(fileIndexes, fileIndex[idx])
+			byteOffsets = append(byteOffsets, walOffset[idx])
+			mts.currentIndex = (mts.currentIndex + 1) % mts.maxTables
+			mt = mts.tables[mts.currentIndex]
+		}
+		_ = mt.structure.Add(record)
+	}
+
+	return fileIndexes, byteOffsets
 }

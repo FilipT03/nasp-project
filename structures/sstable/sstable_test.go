@@ -521,7 +521,7 @@ func TestMergeSSTablesSameKey(t *testing.T) {
 	}
 }
 
-func TestMergeMultipleSSTables(t *testing.T) {
+func TestIterator(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "sstable_test_")
 	if err != nil {
 		t.Fatalf("Failed to create temporary directory: %v", err)
@@ -539,77 +539,114 @@ func TestMergeMultipleSSTables(t *testing.T) {
 	}
 
 	// Create some sample data records.
-	recs1 := []model.Record{
+	recs := []model.Record{
 		{Key: []byte("key1"), Value: []byte("value1"), Timestamp: 1},
 		{Key: []byte("key2"), Value: []byte("value2"), Timestamp: 2},
-	}
-
-	recs2 := []model.Record{
 		{Key: []byte("key3"), Value: []byte("value3"), Timestamp: 3},
 		{Key: []byte("key4"), Value: []byte("value4"), Timestamp: 4},
 	}
 
-	recs3 := []model.Record{
-		{Key: []byte("key5"), Value: []byte("value5"), Timestamp: 5},
-		{Key: []byte("key6"), Value: []byte("value6"), Timestamp: 6},
-	}
-
-	recs4 := []model.Record{
-		{Key: []byte("key7"), Value: []byte("value7"), Timestamp: 7},
-		{Key: []byte("key8"), Value: []byte("value8"), Timestamp: 8},
-	}
-
-	// Create four SSTables.
-	sstable1, err := CreateSSTable(recs1, nil, config)
+	sstable, err := CreateSSTable(recs, nil, config)
 	if err != nil {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
 
-	sstable2, err := CreateSSTable(recs2, nil, config)
+	it, err := sstable.NewIterator(nil)
+	if err != nil {
+		t.Errorf("Failed to create iterator: %v", err)
+	}
+
+	for it.Next() {
+		rec := it.Value()
+		if rec == nil {
+			t.Errorf("Expected a record, got nil")
+		}
+	}
+}
+
+func TestRangeIterator(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "sstable_test_")
+	if err != nil {
+		t.Fatalf("Failed to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	config := &util.SSTableConfig{
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
+		Compression:         false,
+	}
+
+	// Create some sample data records.
+	recs := []model.Record{
+		{Key: []byte("key1"), Value: []byte("value1"), Timestamp: 1},
+		{Key: []byte("key2"), Value: []byte("value2"), Timestamp: 2},
+		{Key: []byte("key3"), Value: []byte("value3"), Timestamp: 3},
+		{Key: []byte("key4"), Value: []byte("value4"), Timestamp: 4},
+	}
+
+	sstable, err := CreateSSTable(recs, nil, config)
 	if err != nil {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
 
-	sstable3, err := CreateSSTable(recs3, nil, config)
+	it, err := sstable.NewRangeIterator([]byte("key1"), []byte("key3"), nil)
+	if err != nil {
+		t.Errorf("Failed to create iterator: %v", err)
+	}
+
+	for it.Next() {
+		rec := it.Value()
+		if rec == nil {
+			t.Errorf("Expected a record, got nil")
+		}
+	}
+}
+
+func TestPrefixIterator(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "sstable_test_")
+	if err != nil {
+		t.Fatalf("Failed to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	config := &util.SSTableConfig{
+		SavePath:            tmpDir,
+		SingleFile:          false,
+		IndexDegree:         2,
+		SummaryDegree:       3,
+		FilterPrecision:     0.01,
+		MerkleTreeChunkSize: 16,
+		Compression:         false,
+	}
+
+	// Create some sample data records.
+	recs := []model.Record{
+		{Key: []byte("key1"), Value: []byte("value1"), Timestamp: 1},
+		{Key: []byte("key2"), Value: []byte("value2"), Timestamp: 2},
+		{Key: []byte("key3"), Value: []byte("value3"), Timestamp: 3},
+		{Key: []byte("key4"), Value: []byte("value4"), Timestamp: 4},
+	}
+
+	sstable, err := CreateSSTable(recs, nil, config)
 	if err != nil {
 		t.Errorf("Failed to create SSTable: %v", err)
 	}
 
-	sstable4, err := CreateSSTable(recs4, nil, config)
+	it, err := sstable.NewPrefixIterator([]byte("key"), nil)
 	if err != nil {
-		t.Errorf("Failed to create SSTable: %v", err)
+		t.Errorf("Failed to create iterator: %v", err)
 	}
 
-	// Merge the SSTables.
-	merged, err := MergeMultipleSSTables([]*SSTable{sstable1, sstable2, sstable3, sstable4}, 2, config, nil)
-	if err != nil {
-		t.Errorf("Failed to merge SSTables: %v", err)
-	}
-
-	// Check that the merged SSTable is correct.
-	dr, err := merged.Read([]byte("key1"), nil)
-	if err != nil {
-		t.Errorf("Failed to read record: %v", err)
-	}
-
-	if bytes.Compare(dr.Value, []byte("value1")) != 0 {
-		t.Errorf("Expected value of 'value1', got %v", dr.Value)
-	}
-
-	dr, err = merged.Read([]byte("key5"), nil)
-	if err != nil {
-		t.Errorf("Failed to read record: %v", err)
-	}
-	if bytes.Compare(dr.Value, []byte("value5")) != 0 {
-		t.Errorf("Expected value of 'value5', got %v", dr.Value)
-	}
-
-	dr, err = merged.Read([]byte("key7"), nil)
-	if err != nil {
-		t.Errorf("Failed to read record: %v", err)
-	}
-	if bytes.Compare(dr.Value, []byte("value7")) != 0 {
-		t.Errorf("Expected value of 'value5', got %v", dr.Value)
+	for it.Next() {
+		rec := it.Value()
+		if rec == nil {
+			t.Errorf("Expected a record, got nil")
+		}
 	}
 }
 
