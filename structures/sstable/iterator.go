@@ -92,7 +92,7 @@ func (sst *SSTable) NewRangeIterator(startKey, endKey []byte, compressionDict *c
 		return nil, err
 	}
 
-	if rec == nil {
+	if rec == nil || bytes.Compare(rec.Key, endKey) > 0 {
 		return &RangeIterator{
 			Iterator{
 				table:           nil,
@@ -146,7 +146,7 @@ func (sst *SSTable) NewPrefixIterator(prefix []byte, compressionDict *compressio
 		return nil, err
 	}
 
-	if rec == nil {
+	if rec == nil || !bytes.HasPrefix(rec.Key, prefix) {
 		return &PrefixIterator{
 			Iterator{
 				table:           nil,
