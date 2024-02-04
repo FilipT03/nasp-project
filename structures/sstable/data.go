@@ -192,6 +192,81 @@ func (db *DataBlock) writeRecord(file *os.File, rec *DataRecord, compressionDict
 	return nil
 }
 
+// writeRecordLen writes a record to the data block file and returns the number of bytes written.
+func (db *DataBlock) writeRecordLen(file *os.File, rec *DataRecord, compressionDict *compression.Dictionary) (int, error) {
+	size := 0
+
+	bytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(bytes, rec.CRC)
+	_, err := file.Write(bytes)
+	if err != nil {
+		return size, err
+	}
+	size += 4
+
+	n, err := util.WriteUvarintLen(file, rec.Timestamp)
+	if err != nil {
+		return size, err
+	}
+	size += n
+
+	if rec.Tombstone {
+		_, err = file.Write([]byte{1})
+		if err != nil {
+			return size, err
+		}
+	} else {
+		_, err = file.Write([]byte{0})
+		if err != nil {
+			return size, err
+		}
+	}
+	size += 1
+
+	if compressionDict == nil {
+		// KeySize is left out if the compression is turned on
+		n, err = util.WriteUvarintLen(file, uint64(len(rec.Key)))
+		if err != nil {
+			return size, err
+		}
+		size += n
+	}
+
+	if !rec.Tombstone {
+		n, err = util.WriteUvarintLen(file, uint64(len(rec.Value)))
+		if err != nil {
+			return size, err
+		}
+		size += n
+	}
+
+	if compressionDict == nil {
+		// compression if off, write the key bytes as-is
+		n, err = file.Write(rec.Key)
+		if err != nil {
+			return size, err
+		}
+		size += n
+	} else {
+		// compression is on, write only index from compression dictionary
+		n, err = util.WriteUvarintLen(file, uint64(compressionDict.GetIdx(rec.Key)))
+		if err != nil {
+			return size, err
+		}
+		size += n
+	}
+
+	if !rec.Tombstone {
+		n, err = file.Write(rec.Value)
+		if err != nil {
+			return size, err
+		}
+		size += n
+	}
+
+	return size, nil
+}
+
 // isEndOfBlock return true if file pointer is positioned at the end of the given data block.
 func (db *DataBlock) isEndOfBlock(file *os.File) (bool, error) {
 	pos, err := file.Seek(0, 1)
@@ -370,6 +445,83 @@ func (db *DataBlock) GetRecordAtKeyFromOffset(key []byte, offset int64, compress
 			return dataRec, offset, nil
 		}
 	}
+}
+
+// DataRecordGenerator is used for iterating over a list of all records from consecutive data blocks.
+// Use GetNextRecord method to return next record, starting from the first one.
+// Please remember to call Clear too free up resources after the usage.
+type DataRecordGenerator struct {
+	blocks          []*DataBlock
+	blockPtr        int                     // index of the block with the next record
+	file            *os.File                // currently open data block file
+	reachedEnd      bool                    // true if there are no more records to be read
+	compressionDict *compression.Dictionary // pass to NewDataRecordGenerator if compression was used
+}
+
+// NewDataRecordGenerator creates a DataRecordGenerator for the given blocks.
+func NewDataRecordGenerator(blocks []*DataBlock, compressionDict *compression.Dictionary) (*DataRecordGenerator, error) {
+	var firstFile *os.File
+	var reachedEnd = false
+	if len(blocks) < 1 {
+		firstFile = nil
+		reachedEnd = true
+	} else {
+		tmpFileVariable, err := os.Open(blocks[0].Filename) // I hate GO.
+		if err != nil {
+			return nil, err
+		}
+		firstFile = tmpFileVariable
+	}
+	return &DataRecordGenerator{
+		blocks:          blocks,
+		blockPtr:        0,
+		file:            firstFile,
+		reachedEnd:      reachedEnd,
+		compressionDict: compressionDict,
+	}, nil
+}
+
+// GetNextRecord returns the next record from the data block sequence, or nil if the end is reached.
+func (gen *DataRecordGenerator) GetNextRecord() (*DataRecord, error) {
+	if gen.reachedEnd {
+		return nil, nil
+	}
+	nextRec, err := gen.blocks[gen.blockPtr].getNextRecord(gen.file, gen.compressionDict)
+	if err != nil {
+		return nil, err
+	}
+	if nextRec == nil {
+		gen.file.Close()
+		gen.blockPtr++
+		if gen.blockPtr >= len(gen.blocks) {
+			gen.reachedEnd = true
+			gen.file = nil
+			return nil, nil
+		}
+		gen.file, err = os.Open(gen.blocks[gen.blockPtr].Filename)
+		if err != nil {
+			return nil, err
+		}
+		return gen.GetNextRecord()
+	}
+	return nextRec, nil
+}
+
+// Clear frees up resources that the DataRecordGenerator uses.
+// After the call to Clear, each next call of GetNextRecord will return nil.
+func (gen *DataRecordGenerator) Clear() error {
+	gen.blocks = nil
+	gen.blockPtr = 0
+	if gen.file != nil {
+		err := gen.file.Close()
+		if err != nil {
+			return err
+		}
+		gen.file = nil
+	}
+	gen.reachedEnd = true
+	gen.compressionDict = nil
+	return nil
 }
 
 // WriteMerged merges db1 and db2 and writes the result to db.

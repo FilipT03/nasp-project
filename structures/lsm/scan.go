@@ -10,7 +10,7 @@ import (
 func RangeScan(startKey, endKey []byte, maxRecords int, compressionDict *compression.Dictionary, config *util.Config) ([]*model.Record, error) {
 	var scans [][]*model.Record
 	for lvl := 1; lvl <= config.LSMTree.MaxLevel; lvl++ {
-		tables, err := GetSSTablesForLevel(lvl, config)
+		tables, err := GetSSTablesForLevel(config.SSTable.SavePath, lvl)
 		if err != nil {
 			return nil, err
 		}
@@ -33,7 +33,7 @@ func RangeScan(startKey, endKey []byte, maxRecords int, compressionDict *compres
 func PrefixScan(prefix []byte, maxRecords int, compressionDict *compression.Dictionary, config *util.Config) ([]*model.Record, error) {
 	var scans [][]*model.Record
 	for lvl := 1; lvl <= config.LSMTree.MaxLevel; lvl++ {
-		tables, err := GetSSTablesForLevel(lvl, config)
+		tables, err := GetSSTablesForLevel(config.SSTable.SavePath, lvl)
 		if err != nil {
 			return nil, err
 		}

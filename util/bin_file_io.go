@@ -16,6 +16,18 @@ func WriteUvarint(file *os.File, num uint64) error {
 	return nil
 }
 
+// WriteUvarintLen writes encodes num using variable-length encoding, writes it to file
+// and returns the number of bytes written to file.
+func WriteUvarintLen(file *os.File, num uint64) (int, error) {
+	bytes := make([]byte, binary.MaxVarintLen64)
+	n := binary.PutUvarint(bytes, num)
+	n, err := file.Write(bytes[:n])
+	if err != nil {
+		return n, err
+	}
+	return n, nil
+}
+
 // ReadUvarint reads variable-length encoded number from file.
 // The file pointer is set to the end of the read value bytes.
 func ReadUvarint(file *os.File) (uint64, error) {

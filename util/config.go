@@ -9,8 +9,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// TODO: Add support for size-tiered, leveled and token bucket algorithms
-
 type Config struct {
 	WAL         WALConfig         `yaml:"WAL"`
 	Memtable    MemtableConfig    `yaml:"Memtable"`
@@ -53,9 +51,20 @@ type SSTableConfig struct {
 }
 
 type LSMTreeConfig struct {
-	MaxLevel            int    `yaml:"maxLevel" validate:"gte=1"`
-	CompactionAlgorithm string `yaml:"compactionAlgorithm" validate:"oneof=Size-Tiered Leveled"`
-	MaxLsmNodesPerLevel int    `yaml:"maxLsmNodesPerLevel" validate:"gte=1"`
+	MaxLevel            int              `yaml:"maxLevel" validate:"gte=1"`
+	CompactionAlgorithm string           `yaml:"compactionAlgorithm" validate:"oneof=Size-Tiered Leveled"`
+	SizeTiered          SizeTieredConfig `yaml:"SizeTiered:"`
+	Leveled             LeveledConfig    `yaml:"Leveled"`
+}
+
+type SizeTieredConfig struct {
+	MaxLsmNodesPerLevel int `yaml:"maxLsmNodesPerLevel" validate:"gte=1"`
+}
+
+type LeveledConfig struct {
+	DataBlockSize           int64 `yaml:"dataBlockSize" validate:"gte=1"`
+	FirstLevelTotalDataSize int64 `yaml:"firstLevelTotalDataSize" validate:"gte=1"`
+	FanoutSize              int8  `yaml:"fanoutSize" validate:"gt=1"`
 }
 
 type CacheConfig struct {
@@ -96,7 +105,14 @@ var config = &Config{
 	LSMTree: LSMTreeConfig{
 		MaxLevel:            4,
 		CompactionAlgorithm: "Size-Tiered",
-		MaxLsmNodesPerLevel: 8,
+		SizeTiered: SizeTieredConfig{
+			MaxLsmNodesPerLevel: 8,
+		},
+		Leveled: LeveledConfig{
+			DataBlockSize:           160_000,   // 160 Kb
+			FirstLevelTotalDataSize: 1_000_000, // 1 Mb
+			FanoutSize:              10,
+		},
 	},
 	Cache: CacheConfig{
 		MaxSize: 1024,

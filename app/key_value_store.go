@@ -5,6 +5,7 @@ import (
 	"nasp-project/model"
 	"nasp-project/structures/lru_cache"
 	"nasp-project/structures/lsm"
+	"nasp-project/structures/lsm/compactions"
 	"nasp-project/structures/memtable"
 	"nasp-project/structures/sstable"
 	writeaheadlog "nasp-project/structures/write-ahead_log"
@@ -150,7 +151,7 @@ func (kvs *KeyValueStore) put(key string, value []byte) error {
 			return err
 		}
 
-		err = lsm.Compact(compressionDict, &kvs.config.LSMTree, &kvs.config.SSTable)
+		err = compactions.Compact(compressionDict, &kvs.config.LSMTree, &kvs.config.SSTable)
 		if err != nil {
 			return err
 		}

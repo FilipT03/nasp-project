@@ -48,8 +48,10 @@ func TestCompact(t *testing.T) {
 		fmt.Println(sstable4)
 	}
 	lsmConfig := &util.LSMTreeConfig{
-		MaxLevel:            3,
-		MaxLsmNodesPerLevel: 2,
+		MaxLevel: 3,
+		SizeTiered: util.SizeTieredConfig{
+			MaxLsmNodesPerLevel: 2,
+		},
 	}
 	Compact(nil, config, lsmConfig)
 	// Check if compaction has been performed correctly
