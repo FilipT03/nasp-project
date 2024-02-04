@@ -9,7 +9,10 @@ import (
 // NewHLL creates a new hyperloglog record with specified key.
 // Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) NewHLL(key string, p uint32) error {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return err
+		}
 		return errors.New("rate limit reached")
 	}
 	key = util.HyperLogLogPrefix + key
@@ -20,7 +23,10 @@ func (kvs *KeyValueStore) NewHLL(key string, p uint32) error {
 // DeleteHLL deletes a hyperloglog record with the specified key.
 // Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) DeleteHLL(key string) error {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return err
+		}
 		return errors.New("rate limit reached")
 	}
 	key = util.HyperLogLogPrefix + key
@@ -30,7 +36,10 @@ func (kvs *KeyValueStore) DeleteHLL(key string) error {
 // HLLAdd performs Add(val) operation on a hyperloglog record with the specified key.
 // Returns an error if no hyperloglog record with the given key exists.
 func (kvs *KeyValueStore) HLLAdd(key string, val []byte) error {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return err
+		}
 		return errors.New("rate limit reached")
 	}
 	key = util.HyperLogLogPrefix + key
@@ -49,8 +58,11 @@ func (kvs *KeyValueStore) HLLAdd(key string, val []byte) error {
 // HLLEstimate performs Add(val) operation on a hyperloglog record with the specified key.
 // Returns an error if no hyperloglog record with the given key exists.
 func (kvs *KeyValueStore) HLLEstimate(key string) (float64, error) {
-	if kvs.rateLimitReached() {
-		return -1, errors.New("rate limit reached")
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return 0, err
+		}
+		return 0, errors.New("rate limit reached")
 	}
 	key = util.HyperLogLogPrefix + key
 	hllBytes, err := kvs.get(key)
