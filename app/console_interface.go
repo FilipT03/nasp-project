@@ -87,15 +87,15 @@ func parseAndExecute(input string, db *KeyValueStore) (bool, error) {
 			var f *os.File
 			if len(parts) == 5 { // there should be an append flag
 				if isFlag(parts[2], "d") && isFlag(parts[4], "a") {
-					f, err = os.OpenFile(parts[3], os.O_APPEND|os.O_CREATE, 0644)
+					f, err = os.OpenFile(parts[3], os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 				} else if isFlag(parts[3], "d") && isFlag(parts[2], "a") {
-					f, err = os.OpenFile(parts[4], os.O_APPEND|os.O_CREATE, 0644)
+					f, err = os.OpenFile(parts[4], os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 				} else { // flags are not present
 					return false, errors.New("invalid arguments")
 				}
 			} else { // there is no append flag
 				if isFlag(parts[2], "d") {
-					f, err = os.OpenFile(parts[3], os.O_TRUNC|os.O_CREATE, 0644)
+					f, err = os.OpenFile(parts[3], os.O_TRUNC|os.O_CREATE|os.O_RDWR, 0644)
 				} else {
 					return false, errors.New("invalid arguments")
 				}
