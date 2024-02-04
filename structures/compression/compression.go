@@ -103,6 +103,7 @@ func WriteCompressionDictToFile(compressionDict *Dictionary, savePath, filename 
 		if err != nil {
 			return err
 		}
+		file, err = os.Create(filepath.Join(savePath, filename))
 	} else if err != nil {
 		return err
 	}
