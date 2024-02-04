@@ -81,8 +81,10 @@ func mergeTwoScans(scan1 []*model.Record, scan2 []*model.Record) []*model.Record
 		} else if rec1.Timestamp > rec2.Timestamp {
 			merged = append(merged, rec1)
 			i++
+			j++
 		} else {
 			merged = append(merged, rec2)
+			i++
 			j++
 		}
 	}
