@@ -124,7 +124,7 @@ func NewWAL(walConfig *util.WALConfig, memtableInstances int) (*WAL, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = f.Truncate(int64((MemtableIndexingSize + 1) * memtableInstances))
+	err = f.Truncate(int64(MemtableIndexingSize * (memtableInstances + 1)))
 	if err != nil {
 		return nil, err
 	}
