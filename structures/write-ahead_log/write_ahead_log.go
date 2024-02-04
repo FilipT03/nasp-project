@@ -495,11 +495,11 @@ func (wal *WAL) GetAllRecords() ([]*model.Record, []uint32, []uint64, error) {
 		return nil, nil, nil, err
 	}
 
-	var toSkip uint32
+	var toSkip int64
 	if startFileIndex == 0 {
 		toSkip = 0
 	} else {
-		toSkip = startFileIndex - uint32(oldestFileIndex)
+		toSkip = int64(startFileIndex) - int64(oldestFileIndex)
 		if toSkip < 0 {
 			return nil, nil, nil, errors.New("memtable indexing file referencing non existent files")
 		}
@@ -604,6 +604,10 @@ func (wal *WAL) UpdateMemtableIndexing(fileIndexes []uint32, byteOffsets []uint6
 	for i := 0; i < len(fileIndexes); i++ {
 		byteS = binary.LittleEndian.AppendUint32(byteS, fileIndexes[i])
 		byteS = binary.LittleEndian.AppendUint64(byteS, byteOffsets[i])
+	}
+	_, err = f.Write(byteS)
+	if err != nil {
+		return err
 	}
 	return nil
 }

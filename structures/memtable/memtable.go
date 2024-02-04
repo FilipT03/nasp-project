@@ -197,6 +197,10 @@ func (mts *Memtables) Reconstruct(records []*model.Record, fileIndex []uint32, w
 			fileIndexes = append(fileIndexes, fileIndex[idx])
 			byteOffsets = append(byteOffsets, walOffset[idx])
 			mts.currentIndex = (mts.currentIndex + 1) % mts.maxTables
+			if mts.currentIndex == 0 {
+				log.Printf("warning: Can't fit all data into memtables, couldn't load %d commits.\n", len(records)-idx)
+				break
+			}
 			mt = mts.tables[mts.currentIndex]
 		}
 		_ = mt.structure.Add(record)
