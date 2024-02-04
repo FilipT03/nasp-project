@@ -47,6 +47,12 @@ func (bt *BTree) Get(key []byte) (*model.Record, error) {
 // Add a new record to the B-tree while handling overflows.
 func (bt *BTree) Add(record *model.Record) error {
 	index, nodeToInsert, ancestors, found := bt.findKey(record.Key, false)
+	for _, nodeRecord := range nodeToInsert.records {
+		if bytes.Compare(nodeRecord.Key, record.Key) == 0 {
+			nodeRecord = record
+			return nil
+		}
+	}
 	_, err := nodeToInsert.addRecord(record, index)
 	if found && bt.size >= bt.capacity {
 		return errors.New("error: failed to add item with key " + string(record.Key) + ", b tree is full")
