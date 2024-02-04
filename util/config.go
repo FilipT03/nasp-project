@@ -53,7 +53,7 @@ type SSTableConfig struct {
 type LSMTreeConfig struct {
 	MaxLevel            int              `yaml:"maxLevel" validate:"gte=1"`
 	CompactionAlgorithm string           `yaml:"compactionAlgorithm" validate:"oneof=Size-Tiered Leveled"`
-	SizeTiered          SizeTieredConfig `yaml:"SizeTiered:"`
+	SizeTiered          SizeTieredConfig `yaml:"SizeTiered"`
 	Leveled             LeveledConfig    `yaml:"Leveled"`
 }
 
@@ -78,7 +78,7 @@ type TokenBucketConfig struct {
 
 var config = &Config{
 	WAL: WALConfig{
-		SegmentSize:   32768,
+		SegmentSize:   1048576,
 		BufferSize:    8,
 		WALFolderPath: "./wal",
 	},
