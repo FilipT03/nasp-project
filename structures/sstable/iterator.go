@@ -105,7 +105,7 @@ func (sst *SSTable) NewRangeIterator(startKey, endKey []byte, compressionDict *c
 		}, nil
 	}
 
-	return &RangeIterator{
+	it := &RangeIterator{
 		Iterator{
 			table:           sst,
 			offset:          offset,
@@ -114,7 +114,11 @@ func (sst *SSTable) NewRangeIterator(startKey, endKey []byte, compressionDict *c
 		},
 		startKey,
 		endKey,
-	}, nil
+	}
+	if util.IsReservedKey(it.Value().Key) {
+		it.Next()
+	}
+	return it, nil
 }
 
 func (it *RangeIterator) Next() bool {
@@ -158,7 +162,7 @@ func (sst *SSTable) NewPrefixIterator(prefix []byte, compressionDict *compressio
 		}, nil
 	}
 
-	return &PrefixIterator{
+	it := &PrefixIterator{
 		Iterator{
 			table:           sst,
 			offset:          offset,
@@ -166,7 +170,11 @@ func (sst *SSTable) NewPrefixIterator(prefix []byte, compressionDict *compressio
 			compressionDict: compressionDict,
 		},
 		prefix,
-	}, nil
+	}
+	if util.IsReservedKey(it.Value().Key) {
+		it.Next()
+	}
+	return it, nil
 }
 
 func (it *PrefixIterator) Next() bool {
