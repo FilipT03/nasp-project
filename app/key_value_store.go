@@ -150,7 +150,10 @@ func (kvs *KeyValueStore) put(key string, value []byte) error {
 		return err
 	}
 
-	kvs.wal.PutCommit(key, value)
+	err = kvs.wal.PutCommit(key, value)
+	if err != nil {
+		return err
+	}
 
 	if kvs.memtables.IsFull() {
 		recs, flushedIdx := kvs.memtables.Flush()
@@ -191,9 +194,12 @@ func (kvs *KeyValueStore) put(key string, value []byte) error {
 // Uses put operation for adding a new record.
 // Returns an error if the write fails.
 func (kvs *KeyValueStore) delete(key string) error {
-	kvs.wal.DeleteCommit(key, nil)
+	err := kvs.wal.DeleteCommit(key, nil)
+	if err != nil {
+		return err
+	}
 
-	err := kvs.memtables.Delete([]byte(key)) // sets the tombstone to true
+	err = kvs.memtables.Delete([]byte(key)) // sets the tombstone to true
 	if err != nil {
 		// key does not exist in memtables, add it first
 		err = kvs.put(key, nil)
