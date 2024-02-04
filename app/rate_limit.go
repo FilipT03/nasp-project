@@ -1,14 +1,15 @@
 package app
 
 import (
+	"errors"
 	"nasp-project/structures/token_bucket"
 	"nasp-project/util"
 )
 
-func (kvs *KeyValueStore) rateLimitReached() bool {
+func (kvs *KeyValueStore) rateLimitReached() (bool, error) {
 	tbBytes, err := kvs.get(util.RateLimiterKey)
-	if err != nil { // block request if Token Bucket read fails
-		return true
+	if err != nil {
+		return true, err
 	}
 
 	var tb *token_bucket.TokenBucket = nil
@@ -18,16 +19,16 @@ func (kvs *KeyValueStore) rateLimitReached() bool {
 		tb = token_bucket.Deserialize(tbBytes)
 	}
 
-	if tb == nil { // block request in case of error
-		return true
+	if tb == nil {
+		return true, errors.New("token bucket read failed")
 	}
 
 	allowed := tb.CheckTokenCondition()
 
 	err = kvs.put(util.RateLimiterKey, tb.Serialize())
-	if err != nil { // block request if Token Bucket operation fails
-		return true
+	if err != nil {
+		return true, err
 	}
 
-	return !allowed
+	return !allowed, nil
 }

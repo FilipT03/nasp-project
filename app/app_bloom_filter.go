@@ -11,7 +11,10 @@ import (
 // the expected number of elements (n) and desired false-positive probability (p).
 // Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) NewBF(key string, n uint, p float64) error {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return err
+		}
 		return errors.New("rate limit reached")
 	}
 	key = util.BloomFilterPrefix + key
@@ -22,7 +25,10 @@ func (kvs *KeyValueStore) NewBF(key string, n uint, p float64) error {
 // DeleteBF deletes a bloom filter record with the specified key.
 // Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) DeleteBF(key string) error {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return err
+		}
 		return errors.New("rate limit reached")
 	}
 	key = util.BloomFilterPrefix + key
@@ -33,7 +39,10 @@ func (kvs *KeyValueStore) DeleteBF(key string) error {
 // Returns an error if no bloom filter record with the given key exists.
 // Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) BFAdd(key string, val []byte) error {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return err
+		}
 		return errors.New("rate limit reached")
 	}
 	key = util.BloomFilterPrefix + key
@@ -56,7 +65,10 @@ func (kvs *KeyValueStore) BFAdd(key string, val []byte) error {
 // Returns an error if no bloom filter record with the given key exists.
 // Returns an error if the read fails or the rate limit is reached.
 func (kvs *KeyValueStore) BFHasKey(key string, val []byte) (bool, error) {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return false, err
+		}
 		return false, errors.New("rate limit reached")
 	}
 	key = util.BloomFilterPrefix + key

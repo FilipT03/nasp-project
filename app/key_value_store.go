@@ -44,7 +44,10 @@ func NewKeyValueStore(config *util.Config) (*KeyValueStore, error) {
 // Returns nil if the key is not found.
 // Returns an error if the read fails or the rate limit is reached.
 func (kvs *KeyValueStore) Get(key string) ([]byte, error) {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return nil, err
+		}
 		return nil, errors.New("rate limit reached")
 	}
 	if util.IsReservedKey([]byte(key)) {
@@ -56,7 +59,10 @@ func (kvs *KeyValueStore) Get(key string) ([]byte, error) {
 // Put saves a key-value pair to the database.
 // Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) Put(key string, value []byte) error {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return err
+		}
 		return errors.New("rate limit reached")
 	}
 	if util.IsReservedKey([]byte(key)) {
@@ -68,7 +74,10 @@ func (kvs *KeyValueStore) Put(key string, value []byte) error {
 // Delete deletes a value associated with the specified key from the database.
 // Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) Delete(key string) error {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return err
+		}
 		return errors.New("rate limit reached")
 	}
 	if util.IsReservedKey([]byte(key)) {
@@ -141,7 +150,10 @@ func (kvs *KeyValueStore) put(key string, value []byte) error {
 		return err
 	}
 
-	kvs.wal.PutCommit(key, value)
+	err = kvs.wal.PutCommit(key, value)
+	if err != nil {
+		return err
+	}
 
 	if kvs.memtables.IsFull() {
 		recs, flushedIdx := kvs.memtables.Flush()
@@ -182,9 +194,12 @@ func (kvs *KeyValueStore) put(key string, value []byte) error {
 // Uses put operation for adding a new record.
 // Returns an error if the write fails.
 func (kvs *KeyValueStore) delete(key string) error {
-	kvs.wal.DeleteCommit(key, nil)
+	err := kvs.wal.DeleteCommit(key, nil)
+	if err != nil {
+		return err
+	}
 
-	err := kvs.memtables.Delete([]byte(key)) // sets the tombstone to true
+	err = kvs.memtables.Delete([]byte(key)) // sets the tombstone to true
 	if err != nil {
 		// key does not exist in memtables, add it first
 		err = kvs.put(key, nil)

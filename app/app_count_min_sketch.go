@@ -9,7 +9,10 @@ import (
 // NewCMS creates a new count-min sketch record with specified key.
 // Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) NewCMS(key string, epsilon float64, delta float64) error {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return err
+		}
 		return errors.New("rate limit reached")
 	}
 	key = util.CountMinSketchPrefix + key
@@ -20,7 +23,10 @@ func (kvs *KeyValueStore) NewCMS(key string, epsilon float64, delta float64) err
 // DeleteCMS deletes a count-min sketch record with the specified key.
 // Returns an error if the write fails or the rate limit is reached.
 func (kvs *KeyValueStore) DeleteCMS(key string) error {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return err
+		}
 		return errors.New("rate limit reached")
 	}
 	key = util.CountMinSketchPrefix + key
@@ -30,7 +36,10 @@ func (kvs *KeyValueStore) DeleteCMS(key string) error {
 // CMSAdd performs Add(val) operation on a count-min sketch record with the specified key.
 // Returns an error if no count-min sketch record with the given key exists.
 func (kvs *KeyValueStore) CMSAdd(key string, val []byte) error {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return err
+		}
 		return errors.New("rate limit reached")
 	}
 	key = util.CountMinSketchPrefix + key
@@ -50,7 +59,10 @@ func (kvs *KeyValueStore) CMSAdd(key string, val []byte) error {
 // CMSGet performs Estimate(val) operation on a count-min sketch record with the specified key.
 // Returns an error if no count-min sketch record with the given key exists.
 func (kvs *KeyValueStore) CMSGet(key string, val []byte) (int, error) {
-	if kvs.rateLimitReached() {
+	if block, err := kvs.rateLimitReached(); block {
+		if err != nil {
+			return -1, err
+		}
 		return -1, errors.New("rate limit reached")
 	}
 	key = util.CountMinSketchPrefix + key
