@@ -2,7 +2,6 @@ package util
 
 const ConfigPath = "config.yaml"
 
-const CompressionDictKey = "__COMP_DICT__"
 const RateLimiterKey = "__TB_RATE_LIMIT__"
 
 const BloomFilterPrefix = "__BF_"

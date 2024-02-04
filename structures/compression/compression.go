@@ -1,6 +1,10 @@
 package compression
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"os"
+	"path/filepath"
+)
 
 // Dictionary contains two-way mapping between db keys and integers.
 // The key of the dictionary record itself should always be mapped to 0.
@@ -10,11 +14,10 @@ type Dictionary struct {
 }
 
 // NewDictionary creates a new compression dictionary.
-// It contains one mapping: dictKey -> 0
-func NewDictionary(dictKey []byte) *Dictionary {
+func NewDictionary() *Dictionary {
 	return &Dictionary{
-		keys:   [][]byte{dictKey},
-		idxMap: map[string]int{string(dictKey): 0},
+		keys:   [][]byte{},
+		idxMap: map[string]int{},
 	}
 }
 
@@ -77,4 +80,36 @@ func Deserialize(data []byte) *Dictionary {
 		dict.idxMap[string(key)] = idx
 	}
 	return &dict
+}
+
+func LoadCompressionDictFromFile(savePath, filename string) (*Dictionary, error) {
+	path := filepath.Join(savePath, filename)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return NewDictionary(), nil
+	} else if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return Deserialize(data), nil
+}
+
+func WriteCompressionDictToFile(compressionDict *Dictionary, savePath, filename string) error {
+	file, err := os.Create(filepath.Join(savePath, filename))
+	if os.IsNotExist(err) {
+		err := os.MkdirAll(savePath, 0755)
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = file.Write(compressionDict.Serialize())
+	if err != nil {
+		return err
+	}
+	return nil
 }
