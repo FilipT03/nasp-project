@@ -64,7 +64,10 @@ func mergeAllScans(scans [][]*model.Record) []*model.Record {
 		}
 		scans = newScans
 	}
-	return scans[0]
+	if len(scans) > 0 {
+		return scans[0]
+	}
+	return nil
 }
 
 func mergeTwoScans(scan1 []*model.Record, scan2 []*model.Record) []*model.Record {
