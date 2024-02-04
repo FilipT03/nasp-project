@@ -114,3 +114,33 @@ func WriteCompressionDictToFile(compressionDict *Dictionary, savePath, filename 
 	}
 	return nil
 }
+
+// AppendLastToFile assumes that all but last record are written to file and appends the last record to the end.
+// Call this function after Dictionary.Add returns true to update the structure on disk.
+func (d *Dictionary) AppendLastToFile(savePath, filename string) error {
+	file, err := os.OpenFile(filepath.Join(savePath, filename), os.O_APPEND|os.O_WRONLY, 0644)
+	if os.IsNotExist(err) {
+		err := os.MkdirAll(savePath, 0755)
+		if err != nil {
+			return err
+		}
+		file, err = os.Create(filepath.Join(savePath, filename))
+	} else if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	buf := make([]byte, binary.MaxVarintLen64)
+	n := binary.PutUvarint(buf, uint64(len(d.keys[len(d.keys)-1])))
+	_, err = file.Write(buf[:n])
+	if err != nil {
+		return err
+	}
+
+	_, err = file.Write(d.keys[len(d.keys)-1])
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

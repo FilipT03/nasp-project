@@ -11,7 +11,10 @@ func (kvs *KeyValueStore) getCompressionDict() (*compression.Dictionary, error) 
 		// compression turned off
 		return nil, nil
 	}
-	return compression.LoadCompressionDictFromFile(kvs.config.SSTable.SavePath, kvs.config.SSTable.CompressionFilename)
+	if kvs.compressionDict == nil {
+		return compression.LoadCompressionDictFromFile(kvs.config.SSTable.SavePath, kvs.config.SSTable.CompressionFilename)
+	}
+	return kvs.compressionDict, nil
 }
 
 // updateCompressionDict adds the given key to the global compression dictionary and returns the updated dictionary.
@@ -22,19 +25,23 @@ func (kvs *KeyValueStore) updateCompressionDict(key string) (*compression.Dictio
 		return nil, nil
 	}
 
-	compressionDict, err := kvs.getCompressionDict()
-	if err != nil {
-		return nil, err
+	if kvs.compressionDict == nil {
+		compressionDict, err := kvs.getCompressionDict()
+		if err != nil {
+			return nil, err
+		}
+		kvs.compressionDict = compressionDict
 	}
 
-	added := compressionDict.Add([]byte(key))
+	added := kvs.compressionDict.Add([]byte(key))
 
 	if added {
-		err = compression.WriteCompressionDictToFile(compressionDict, kvs.config.SSTable.SavePath, kvs.config.SSTable.CompressionFilename)
+		//err := compression.WriteCompressionDictToFile(kvs.compressionDict, kvs.config.SSTable.SavePath, kvs.config.SSTable.CompressionFilename)
+		err := kvs.compressionDict.AppendLastToFile(kvs.config.SSTable.SavePath, kvs.config.SSTable.CompressionFilename)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return compressionDict, nil
+	return kvs.compressionDict, nil
 }

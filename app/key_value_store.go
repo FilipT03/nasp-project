@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"nasp-project/model"
+	"nasp-project/structures/compression"
 	"nasp-project/structures/lru_cache"
 	"nasp-project/structures/lsm"
 	"nasp-project/structures/lsm/compactions"
@@ -14,10 +15,11 @@ import (
 )
 
 type KeyValueStore struct {
-	config    *util.Config
-	wal       *writeaheadlog.WAL
-	memtables *memtable.Memtables
-	cache     *lru_cache.LRUCache
+	config          *util.Config
+	wal             *writeaheadlog.WAL
+	memtables       *memtable.Memtables
+	cache           *lru_cache.LRUCache
+	compressionDict *compression.Dictionary
 }
 
 // NewKeyValueStore creates an instance of Key-Value Storage engine with configuration given at ConfigPath.
@@ -33,10 +35,11 @@ func NewKeyValueStore(config *util.Config) (*KeyValueStore, error) {
 	cache := lru_cache.NewLRUCache(config.Cache.MaxSize)
 
 	return &KeyValueStore{
-		config:    config,
-		wal:       wal,
-		memtables: mts,
-		cache:     &cache,
+		config:          config,
+		wal:             wal,
+		memtables:       mts,
+		cache:           &cache,
+		compressionDict: nil,
 	}, nil
 }
 
