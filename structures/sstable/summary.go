@@ -126,7 +126,7 @@ func (sb *SummaryBlock) Load(compressionDict *compression.Dictionary) error {
 		_, err = file.Seek(
 			sb.StartOffset+
 				int64(binary.PutUvarint(buf, uint64(compressionDict.GetIdx(sb.StartKey))))+
-				int64(binary.PutUvarint(buf, uint64(compressionDict.GetIdx(sb.StartKey)))),
+				int64(binary.PutUvarint(buf, uint64(compressionDict.GetIdx(sb.EndKey)))),
 			0)
 	}
 	if err != nil {
