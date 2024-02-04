@@ -28,7 +28,16 @@ func NewKeyValueStore(config *util.Config) (*KeyValueStore, error) {
 	}
 
 	mts := memtable.CreateMemtables(&config.Memtable)
-	// TODO: Load WAL records into memtables
+
+	recs, fileIndices, byteOffsets, err := wal.GetAllRecords()
+	if err != nil {
+		return nil, err
+	}
+	fileIndices, byteOffsets = mts.Reconstruct(recs, fileIndices, byteOffsets)
+	err = wal.UpdateMemtableIndexing(fileIndices, byteOffsets)
+	if err != nil {
+		return nil, err
+	}
 
 	cache := lru_cache.NewLRUCache(config.Cache.MaxSize)
 
