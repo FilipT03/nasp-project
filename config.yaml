@@ -1,0 +1,35 @@
+WAL:
+    segmentSize: 1048576
+    bufferSize: 8
+    walFolderPath: ./wal
+Memtable:
+    maxSize: 1024
+    structure: SkipList # SkipList, HashMap, BTree
+    instances: 1
+    BTree:
+        minSize: 16
+    SkipList:
+        maxHeight: 32
+SSTable:
+    savePath: ./data
+    singleFile: false
+    summaryDegree: 5
+    indexDegree: 5
+    compression: true
+    filterPrecision: 0.01
+    merkleTreeChunkSize: 1024
+    compressionFilename: CompressionInfo.bin
+LSMTree:
+    maxLevel: 4
+    compactionAlgorithm: Size-Tiered # Size-Tiered, Leveled
+    SizeTiered:
+        maxLsmNodesPerLevel: 8
+    Leveled:
+        dataBlockSize: 160000
+        firstLevelTotalDataSize: 1000000
+        fanoutSize: 10
+Cache:
+    maxSize: 1024
+TokenBucket:
+    maxTokenSize: 1024
+    interval: 60

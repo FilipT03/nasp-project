@@ -19,3 +19,13 @@
 
 # Go workspace file
 go.work
+
+# IDE files
+.idea
+.vscode
+
+# Database files
+data
+
+# Write Ahead Log files
+wal
