@@ -235,6 +235,12 @@ func mergeGeneratorsWithLimit(
 	var currentTable *SSTable
 	var currentFile *os.File
 
+	defer func() {
+		if currentFile != nil {
+			currentFile.Close()
+		}
+	}()
+
 	var currentWrittenBytes int64
 	var currentWrittenRecords uint
 	// append current table to tables and build it
