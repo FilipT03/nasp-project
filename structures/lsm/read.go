@@ -20,7 +20,7 @@ func Read(key []byte, compressionDict *compression.Dictionary, config *util.Conf
 			return nil, err
 		}
 
-		if config.LSMTree.CompactionAlgorithm == "Leveled" {
+		if lvl > 1 && config.LSMTree.CompactionAlgorithm == "Leveled" {
 			table, err := leveledFindTableWithKey(key, tables, compressionDict)
 			if err != nil {
 				return nil, err
