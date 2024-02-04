@@ -24,8 +24,8 @@ LSMTree:
     SizeTiered:
         maxLsmNodesPerLevel: 8
     Leveled:
-        dataBlockSize: 160_000
-        firstLevelTotalDataSize: 1_000_000
+        dataBlockSize: 160000
+        firstLevelTotalDataSize: 1000000
         fanoutSize: 10
 Cache:
     maxSize: 1024

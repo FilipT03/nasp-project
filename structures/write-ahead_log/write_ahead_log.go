@@ -95,7 +95,9 @@ func NewWAL(walConfig *util.WALConfig, memtableInstances int) (*WAL, error) {
 		return nil, err
 	}
 	var latestFileName = ""
-	if len(dirEntries) == 0 {
+	emptyWal := false
+	if len(dirEntries) == 0 { // create empty first log
+		emptyWal = true
 		latestFileName = "wal_" + strings.Repeat("0", (NumberEnd-NumberStart)-1) + "1.log"
 		f, err := os.OpenFile(logsPath+latestFileName, os.O_RDWR|os.O_CREATE, 0644)
 		if err != nil {
@@ -112,27 +114,32 @@ func NewWAL(walConfig *util.WALConfig, memtableInstances int) (*WAL, error) {
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	} else { // set latestFileName to the latest file
 		latestFileName = dirEntries[len(dirEntries)-1].Name()
 	}
 	f, err := os.OpenFile(memtableIndexingPath, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return nil, err
 	}
-
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(f)
+	// Deleting old memtable indexes since they will be recalculated
 	err = f.Truncate(int64(MemtableIndexingSize))
 	if err != nil {
 		return nil, err
 	}
-	err = f.Truncate(int64((MemtableIndexingSize + 1) * memtableInstances))
+	err = f.Truncate(int64(MemtableIndexingSize * (memtableInstances + 1)))
 	if err != nil {
 		return nil, err
 	}
-	_, _ = f.Seek(0, 0)
-	byteS := make([]byte, 0)
-	byteS = binary.LittleEndian.AppendUint32(byteS, 1)
-	byteS = binary.LittleEndian.AppendUint64(byteS, HeaderSize)
-	_, _ = f.Write(byteS)
+	if emptyWal { // if there were no logs, we need set the start to the new log
+		_, _ = f.Seek(0, 0)
+		byteS := make([]byte, 0)
+		byteS = binary.LittleEndian.AppendUint32(byteS, 1)
+		byteS = binary.LittleEndian.AppendUint64(byteS, HeaderSize)
+		_, _ = f.Write(byteS)
+	}
 
 	return &WAL{
 		buffer:               make([]*Record, 0),
@@ -192,13 +199,18 @@ func (wal *WAL) EmptyBuffer() error {
 // Deletes old logs that were written in the SSTable during the flushing.
 func (wal *WAL) FlushedMemtable(memtableIndex int) error {
 	err := wal.writeBuffer()
-	if err != nil {
+	if err == nil {
 		wal.buffer = make([]*Record, 0)
+	} else {
+		return err
 	}
 	f, err := os.OpenFile(wal.memtableIndexingPath, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(f)
 	_, err = f.Seek(int64(MemtableIndexingSize*(memtableIndex+1)), 0)
 	if err != nil {
 		return err
@@ -211,25 +223,27 @@ func (wal *WAL) FlushedMemtable(memtableIndex int) error {
 	fileIndex := binary.LittleEndian.Uint32(byteS[FileIndexStart : FileIndexStart+FileIndexSize])
 	byteOffset := binary.LittleEndian.Uint64(byteS[ByteOffsetStart : ByteOffsetStart+ByteOffsetSize])
 
-	// Deleting the unneeded logs
-	dirEntries, err := os.ReadDir(wal.logsPath)
-	if err != nil {
-		return err
-	}
-	stringNumber := strconv.Itoa(int(fileIndex))
-	missing := (NumberEnd - NumberStart) - len(stringNumber)
-	for missing > 0 {
-		stringNumber = "0" + stringNumber
-		missing -= 1
-	}
-	endFile := "wal_" + stringNumber + ".log"
-	for _, entry := range dirEntries {
-		if entry.Name() == endFile {
-			break
-		}
-		err := os.Remove(wal.logsPath + entry.Name())
+	if fileIndex != 0 && byteOffset != 0 { // Don't delete files if this memtable is not initialized yet
+		// Deleting the unneeded logs
+		dirEntries, err := os.ReadDir(wal.logsPath)
 		if err != nil {
 			return err
+		}
+		stringNumber := strconv.Itoa(int(fileIndex))
+		missing := (NumberEnd - NumberStart) - len(stringNumber)
+		for missing > 0 {
+			stringNumber = "0" + stringNumber
+			missing -= 1
+		}
+		endFile := "wal_" + stringNumber + ".log"
+		for _, entry := range dirEntries {
+			if entry.Name() == endFile {
+				break
+			}
+			err := os.Remove(wal.logsPath + entry.Name())
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -238,6 +252,9 @@ func (wal *WAL) FlushedMemtable(memtableIndex int) error {
 	if err != nil {
 		return err
 	}
+	defer func(latestFile *os.File) {
+		_ = latestFile.Close()
+	}(latestFile)
 	latestFileStat, err := latestFile.Stat()
 	if err != nil {
 		return err
@@ -267,16 +284,18 @@ func (wal *WAL) FlushedMemtable(memtableIndex int) error {
 		return err
 	}
 
-	_, err = f.Seek(0, 0)
-	if err != nil {
-		return err
-	}
-	byteS = make([]byte, 0)
-	byteS = binary.LittleEndian.AppendUint32(byteS, fileIndex)
-	byteS = binary.LittleEndian.AppendUint64(byteS, byteOffset)
-	_, err = f.Write(byteS)
-	if err != nil {
-		return err
+	if fileIndex != 0 && byteOffset != 0 { // Don't update start if this memtable wasn't initialized
+		_, err = f.Seek(0, 0)
+		if err != nil {
+			return err
+		}
+		byteS = make([]byte, 0)
+		byteS = binary.LittleEndian.AppendUint32(byteS, fileIndex)
+		byteS = binary.LittleEndian.AppendUint64(byteS, byteOffset)
+		_, err = f.Write(byteS)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -326,7 +345,6 @@ func (wal *WAL) writeBuffer() error {
 		// the HeaderSize
 		fSize = HeaderSize
 	}
-	defer f.Close()
 
 	var nextHeader uint64 = 0
 	for _, element := range wal.buffer {
@@ -453,6 +471,9 @@ func (wal *WAL) GetAllRecords() ([]*model.Record, []uint32, []uint64, error) {
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(f)
 	fi, _ := f.Stat()
 	fSize := fi.Size()
 	byteS := make([]byte, fSize)
@@ -571,6 +592,9 @@ func (wal *WAL) UpdateMemtableIndexing(fileIndexes []uint32, byteOffsets []uint6
 	if err != nil {
 		return err
 	}
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(f)
 	_, err = f.Seek(MemtableIndexingSize, 0)
 	if err != nil {
 		return err
