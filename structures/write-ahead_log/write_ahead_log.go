@@ -605,6 +605,10 @@ func (wal *WAL) UpdateMemtableIndexing(fileIndexes []uint32, byteOffsets []uint6
 		byteS = binary.LittleEndian.AppendUint32(byteS, fileIndexes[i])
 		byteS = binary.LittleEndian.AppendUint64(byteS, byteOffsets[i])
 	}
+	_, err = f.Write(byteS)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
