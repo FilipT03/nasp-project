@@ -19,6 +19,8 @@ type memtableStructure interface {
 	Clear()
 	IsFull() bool
 	NewIterator() (util.Iterator, error)
+	NewRangeIterator(startKey []byte, endKey []byte) (util.Iterator, error)
+	NewPrefixIterator(prefix []byte) (util.Iterator, error)
 }
 
 type Memtable struct {
@@ -138,6 +140,7 @@ func (mts *Memtables) Flush() ([]model.Record, int) {
 	return records, flushIdx
 }
 
+// GetIterators returns Iterator for every non-empty Memtable in system.
 func (mts *Memtables) GetIterators() []util.Iterator {
 	iterators := make([]util.Iterator, 0)
 	for i := 0; i < mts.maxTables; i++ {
@@ -150,118 +153,36 @@ func (mts *Memtables) GetIterators() []util.Iterator {
 	return iterators
 }
 
+// GetRangeIterators returns a RangeIterator for every non-empty Memtable in the system.
+func (mts *Memtables) GetRangeIterators(startKey []byte, endKey []byte) []util.Iterator {
+	iterators := make([]util.Iterator, 0)
+	for i := 0; i < mts.maxTables; i++ {
+		mt := mts.tables[i]
+
+		if iter, err := mt.structure.NewRangeIterator(startKey, endKey); err == nil {
+			iterators = append(iterators, iter)
+		}
+	}
+	return iterators
+}
+
+// GetPrefixIterators returns a PrefixIterator for every non-empty Memtable in the system.
+func (mts *Memtables) GetPrefixIterators(prefix []byte) []util.Iterator {
+	iterators := make([]util.Iterator, 0)
+	for i := 0; i < mts.maxTables; i++ {
+		mt := mts.tables[i]
+
+		if iter, err := mt.structure.NewPrefixIterator(prefix); err == nil {
+			iterators = append(iterators, iter)
+		}
+	}
+	return iterators
+}
+
 // isMinimalKey checks if the key obtained from the iterator is smaller than the current minimal key.
 func isMinimalKey(iter util.Iterator, minKey []byte, maxTimestamp uint64) bool {
 	return iter != nil && iter.Value() != nil && (bytes.Compare(iter.Value().Key, minKey) < 0 ||
 		(bytes.Equal(iter.Value().Key, minKey) && iter.Value().Timestamp > maxTimestamp))
-}
-
-// RangeScan returns records from memtables within the inclusive range [minValue, maxValue].
-func (mts *Memtables) RangeScan(minValue []byte, maxValue []byte) []*model.Record {
-	iterators := mts.GetIterators()
-	records := make([]*model.Record, 0)
-
-	// Set all iterators to minValue (or first value greater than minValue)
-	for i := 0; i < len(iterators); i++ {
-		current := iterators[i]
-		if bytes.Compare(current.Value().Key, minValue) >= 0 {
-			continue
-		}
-		for current.Next() {
-			if bytes.Compare(current.Value().Key, minValue) >= 0 {
-				break
-			}
-		}
-	}
-
-	seenValues := make(map[string]bool)
-	for {
-		minIndex := -1
-		minKey := []byte{255}
-		maxTimestamp := uint64(0)
-
-		for i, iter := range iterators {
-			if isMinimalKey(iter, minKey, maxTimestamp) {
-				minIndex = i
-				minKey = iter.Value().Key
-				maxTimestamp = iter.Value().Timestamp
-			}
-		}
-
-		if minIndex == -1 {
-			break
-		}
-
-		if !seenValues[string(minKey)] {
-			if bytes.Compare(iterators[minIndex].Value().Key, maxValue) > 0 {
-				iterators[minIndex] = nil
-				continue
-			}
-			records = append(records, iterators[minIndex].Value())
-			seenValues[string(minKey)] = true
-		}
-
-		if !iterators[minIndex].Next() || bytes.Compare(iterators[minIndex].Value().Key, maxValue) > 0 {
-			iterators[minIndex] = nil
-		}
-	}
-	return records
-}
-
-// PrefixScan returns records from memtables that have the specified prefix.
-func (mts *Memtables) PrefixScan(prefix []byte) []*model.Record {
-	records := make([]*model.Record, 0)
-	if util.IsReservedKey(prefix) {
-		return records
-	}
-	iterators := mts.GetIterators()
-
-	// Set all iterators to first key with prefix.
-	for i := 0; i < len(iterators); i++ {
-		current := iterators[i]
-		if bytes.HasPrefix(current.Value().Key, prefix) {
-			continue
-		}
-		for current.Next() {
-			if bytes.HasPrefix(current.Value().Key, prefix) {
-				break
-			}
-		}
-	}
-
-	seenValues := make(map[string]bool)
-	for {
-		minIndex := -1
-		minKey := []byte{255}
-		maxTimestamp := uint64(0)
-
-		for i, iter := range iterators {
-			if isMinimalKey(iter, minKey, maxTimestamp) {
-				minIndex = i
-				minKey = iter.Value().Key
-				maxTimestamp = iter.Value().Timestamp
-			}
-		}
-
-		if minIndex == -1 {
-			break
-		}
-
-		if !seenValues[string(minKey)] {
-			if !bytes.HasPrefix(iterators[minIndex].Value().Key, prefix) {
-				iterators[minIndex] = nil
-				continue
-			}
-			records = append(records, iterators[minIndex].Value())
-			seenValues[string(minKey)] = true
-		}
-
-		if !iterators[minIndex].Next() {
-			iterators[minIndex] = nil
-		}
-	}
-
-	return records
 }
 
 // Reconstruct fills Memtables with records from the Write-Ahead Log (WAL).
