@@ -326,7 +326,6 @@ func (wal *WAL) writeBuffer() error {
 		// the HeaderSize
 		fSize = HeaderSize
 	}
-	defer f.Close()
 
 	var nextHeader uint64 = 0
 	for _, element := range wal.buffer {
