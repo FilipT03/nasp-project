@@ -567,6 +567,10 @@ func (sst *SSTable) Read(key []byte, compressionDict *compression.Dictionary) (*
 		return nil, err
 	}
 
+	if dr == nil {
+		return nil, nil
+	}
+
 	return &model.Record{
 		Key:       dr.Key,
 		Value:     dr.Value,
